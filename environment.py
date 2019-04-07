@@ -45,17 +45,16 @@ class CausalEnvironment:
     def sample_state(self, prob, n=1):
         return np.argmax(np.random.multinomial(1, prob, size=n))
 
-    def sample(self, action):
-        # new_state_a = self.sample_state(self.pi_a[:, self.state_a, self.state_b, action])
-        # self.state_b = self.sample_state(self.pi_b[:, new_state_a, self.state_a, self.state_b, action])
-        # self.state_a = new_state_a
-        a = self.sample_state(self.action[0])
-        old_s1 = self.sample_state(self.old_s1[0])
-        old_s2 = self.sample_state(self.old_s2[old_s1])
+    def sample(self, action, old_s1=None, old_s2=None):
+        a = action
+        # self.sample_state(self.action[0])
+        if old_s1 is None:
+            old_s1 = self.sample_state(self.old_s1[0])
+            old_s2 = self.sample_state(self.old_s2[old_s1])
         s1 = self.sample_state(self.s1[old_s1, old_s2, a])
         s2 = self.sample_state(self.s2[old_s1, old_s2, s1, a])
         self.state_a = s1
-        self.state_a = s2
+        self.state_b = s2
 
     def reset(self):
         self.n_step = 0
@@ -63,8 +62,8 @@ class CausalEnvironment:
         self.state_b = self.sample_state_uniformly()
         return self.state_a, self.state_b
 
-    def step(self, action):
-        self.sample(action)
+    def step(self, action, old_s1=None, old_s2=None):
+        self.sample(action, old_s1, old_s2)
 
         self.n_step += 1
         reward = 1
