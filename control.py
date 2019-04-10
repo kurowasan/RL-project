@@ -38,42 +38,48 @@ class DynaQ:
                                      self.env.action_dim))
 
     def sample_observation(self):
-        # TODO: choose s1,s2 first, then a
-        idx = np.nonzero(self.observation)
+        state_observed = np.sum(self.observation, axis=2)
+        idx = np.nonzero(state_observed)
         choice = np.random.randint(len(idx[0]))
-        s1, s2, a = (i[choice] for i in idx)
+        s1 = idx[0][choice]
+        s2 = idx[1][choice]
+        idx = np.nonzero(self.observation[s1, s2])
+        choice = np.random.randint(len(idx[0]))
+        a = int(self.observation[s1, s2, idx[0][choice]])
         return s1, s2, a
 
-    def train(self, nb_episode):
-        nb_dream = 10
+    def train(self, nb_episode, nb_simulation):
         s = environment.State()
+        self.reset_observation()
         l_list = np.zeros(nb_episode)
         reward_list = np.zeros(nb_episode)
 
         for episode in range(nb_episode):
+            if episode % 100 == 0:
+                print(episode)
+                __import__('ipdb').set_trace()
             done = False
             old_s1, old_s2 = self.env.reset()
-            self.reset_observation()
             while not done:
                 a = self.q_learning.sample_action(old_s1, old_s2)
                 (s1, s2), reward, done, _ = self.env.step(a)
                 s.set_state(old_s1, old_s2, s1, s2, a)
-                self.q_learning.update(s, a, reward)
+                self.q_learning.update(s, reward)
 
                 l_list[episode] = self.likelihood.update(s)
-                reward_list[episode] = reward
+                reward_list[episode] += reward
 
                 self.update_observation(s)
                 self.model.update(s, reward)
-
-                for n in range(nb_dream):
-                    old_s1, old_s2, a = self.sample_observation()
-                    s1, s2, reward = self.model.simulate(self.likelihood, old_s1, old_s2, a)
-                    s.set_state(old_s1, old_s2, s1, s2, a)
-                    self.q_learning.update(s, a, reward)
-
                 old_s1, old_s2 = s1, s2
-        return l, reward
+
+                for _ in range(nb_simulation):
+                    old_s1_, old_s2_, a = self.sample_observation()
+                    s1_, s2_, reward = self.model.simulate(self.likelihood, old_s1_, old_s2_, a)
+                    s.set_state(old_s1_, old_s2_, s1_, s2_, a)
+                    self.q_learning.update(s, reward)
+
+        return l_list, reward_list
 
 
 class TDLearning:
@@ -96,10 +102,11 @@ class TDLearning:
     def best_action(self, s):
         return np.argmax(self.q[s])
 
-    def update(self, s, a, reward):
+    def update(self, s, reward):
+        action = s.a
         s_prime = self.flatten_state(s.s1, s.s2)
         s = self.flatten_state(s.old_s1, s.old_s2)
-        self.learning_function(s, s_prime, a, reward)
+        self.learning_function(s, s_prime, action, reward)
 
     def q_learning(self, s, s_prime, a, reward):
         self.q[s, a] += self.step_size*(reward + \

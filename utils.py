@@ -40,6 +40,25 @@ def plot_graph(l_a2b, l_b2a, output, fname, savefig=False, title='', std=False):
     else:
         plt.show()
 
+def plot_graph_reward(r_a2b, r_b2a, output, fname, savefig=False, title='', std=False):
+    curve_a2b = np.mean(r_a2b, axis=0)
+    curve_b2a = np.mean(r_b2a, axis=0)
+
+    plt.figure()
+    plt.plot(curve_a2b, label='a->b', color='blue')
+    plt.plot(curve_b2a, label='b->a', color='red')
+    plt.title(title)
+    plt.xlabel('Nb episodes')
+    plt.ylabel('Cumulative Reward')
+    plt.legend()
+
+    if savefig:
+        img_path = os.path.join(output, f'{fname}.png')
+        plt.savefig(img_path)
+    else:
+        plt.show()
+
+
 def save_raw_data(l_a2b, l_b2a, output, fname):
     txt_path = os.path.join(output, f'{fname}_a2b.txt')
     np.savetxt(txt_path, l_a2b)
@@ -57,3 +76,15 @@ def plot_adaptation(l_a2b, l_b2a, output='', savefig=False):
     fname = 'adaptation'
     plot_graph(l_a2b, l_b2a, output, fname, savefig, title)
     save_raw_data(l_a2b, l_b2a, output, fname)
+
+def plot_reward(r_a2b, r_b2a, output='', savefig=False):
+    title = 'Reward during training'
+    fname = 'reward_training'
+    plot_graph_reward(r_a2b, r_b2a, output, fname, savefig, title)
+    save_raw_data(r_a2b, r_b2a, output, fname)
+
+def plot_reward_adapt(r_a2b, r_b2a, output='', savefig=False):
+    title = 'Reward change after adaptation'
+    fname = 'reward_adapt'
+    plot_graph_reward(r_a2b, r_b2a, output, fname, savefig, title)
+    save_raw_data(r_a2b, r_b2a, output, fname)

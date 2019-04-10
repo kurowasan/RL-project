@@ -21,7 +21,7 @@ class EnvironmentModel:
 
     def update(self, s, reward):
         if self.determinist_reward:
-            self.reward_table[s.s1, s.s2, s.a] = reward
+            self.reward_table[s.old_s1, s.old_s2, s.a] = reward
         else:
             if self.count[s.s1, s.s2, s.a]:
                 self.k[s.s1, s.s2, s.a] = reward
@@ -56,7 +56,7 @@ class EnvironmentModel:
                 l = likelihood.get_likelihood(state).detach().numpy()
                 prob[s1 + s2*self.state_dim] = np.exp(l)
         if np.sum(prob) != 1:
-            prob[-1] += 1-np.sum(prob)
+            prob = prob/np.sum(prob)
             # __import__('ipdb').set_trace()
         s = np.random.choice(np.arange(prob.shape[0]), p=prob)
         s1 = s % self.state_dim
@@ -73,8 +73,8 @@ class LikelihoodEstimators:
     def update(self, state):
         l_a2b = self.model_a2b.get_likelihood(state)
         l_b2a = self.model_b2a.get_likelihood(state)
-        nll_a2b = self.model_a2b.update(state)
-        nll_b2a = self.model_b2a.update(state)
+        self.model_a2b.update(state)
+        self.model_b2a.update(state)
         return l_a2b, l_b2a
 
     def get_likelihood(self, state):
@@ -109,7 +109,7 @@ class ModelInterface:
             self.optim.step()
             self.optim.zero_grad()
             self.nll = torch.zeros(1)
-        return -self.model(state).item()
+        return self.model(state).item()
 
     def get_likelihood(self, state):
         self.model.eval()

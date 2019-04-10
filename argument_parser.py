@@ -5,17 +5,17 @@ import argparse
 def parse():
     parser = argparse.ArgumentParser(description='Causal RL experiments')
 
-    parser.add_argument('--state-dim', type=int, default=6,
+    parser.add_argument('--state-dim', type=int, default=4,
                         help='number of value each state can take')
     parser.add_argument('--action-dim', type=int, default=2,
                         help='number of possible actions')
-    parser.add_argument('--nb-episode', type=int, default=500000,
+    parser.add_argument('--nb-episode', type=int, default=100000,
                         help='number of episode used for training')
-    parser.add_argument('--nb-episode-adapt', type=int, default=5000,
+    parser.add_argument('--nb-episode-adapt', type=int, default=1000,
                         help='number of episode used for adaptation')
     parser.add_argument('--nb-run', type=int, default=1,
                         help='number of independent run')
-    parser.add_argument('--nb-step', type=int, default=1,
+    parser.add_argument('--nb-step', type=int, default=5,
                         help='length of episodes')
     parser.add_argument('--lr', type=float, default=5e-4,
                         help='learning rate')
@@ -34,4 +34,4 @@ def save_config(hparam):
     if not os.path.exists(hparam['output']):
         os.makedirs(hparam['output'])
     with open(os.path.join(hparam['output'], 'config.json'), 'w') as f:
-        json.dump(hparam, f)
+        json.dump(hparam, f, indent=4)

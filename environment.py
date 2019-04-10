@@ -13,8 +13,14 @@ class CausalEnvironment:
         self.set_reward_function()
         self.reset()
 
-    def set_reward_function(self):
-        self.reward = np.random.normal(0, 1, (self.reward.shape))
+    def set_reward_function(self, reward_type='bern'):
+        if reward_type == 'normal':
+            self.reward = np.random.normal(0, 1, (self.reward.shape))
+        elif reward_type == 'bern':
+            self.reward = np.random.binomial(1, p=(0.1),
+                                             size=(self.reward.shape))
+            self.reward *= 6
+            self.reward -= 1
 
     def set_prob(self):
         self.action = self.create_rv(self.action_dim, 1)
