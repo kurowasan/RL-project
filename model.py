@@ -66,9 +66,9 @@ class EnvironmentModel:
 
 
 class LikelihoodEstimators:
-    def __init__(self, s, action_dim, lr):
-        self.model_a2b = ModelInterface(s, action_dim, 1, lr)
-        self.model_b2a = ModelInterface(s, action_dim, 2, lr)
+    def __init__(self, s, action_dim, batch_size, lr):
+        self.model_a2b = ModelInterface(s, action_dim, 1, batch_size, lr)
+        self.model_b2a = ModelInterface(s, action_dim, 2, batch_size, lr)
 
     def update(self, state):
         l_a2b = self.model_a2b.get_likelihood(state)
@@ -87,24 +87,25 @@ class LikelihoodEstimators:
 
 
 class ModelInterface:
-    def __init__(self, s, action_dim, a2b, lr=1e-4):
+    def __init__(self, s, action_dim, a2b, batch_size, lr=1e-4):
         cause = Cause(s,s,s, action_dim, a2b)
         effect = Effect(s,s,s,s, action_dim, a2b)
         self.a2b = a2b
         self.model = CausalModel(cause, effect)
         self.optim = optim.RMSprop(self.model.parameters(), lr=lr)
         self.nb_step = 0
+        self.batch_size = batch_size
 
     def reinitialize_optimizer(self, lr):
         self.optim = optim.RMSprop(self.model.parameters(), lr=lr)
 
-    def update(self, state, batch_size=10):
+    def update(self, state):
         if self.nb_step == 0:
             self.nll = torch.zeros(1)
         self.nb_step += 1
         self.model.train()
         self.nll += -self.model(state)
-        if self.nb_step % batch_size == 0:
+        if self.nb_step % self.batch_size == 0:
             self.nll.backward()
             self.optim.step()
             self.optim.zero_grad()

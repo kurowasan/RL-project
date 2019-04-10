@@ -8,7 +8,7 @@ import argument_parser as arg
 
 if __name__ == '__main__':
     hparam = arg.parse()
-    rl_mode = True
+    rl_mode = False
     save_every = 10
 
     likelihood_a2b = np.zeros((hparam['nb_run'], hparam['nb_episode']))
@@ -68,6 +68,7 @@ if __name__ == '__main__':
         else:
             likelihood = model.LikelihoodEstimators(hparam['state_dim'],
                                                     hparam['action_dim'],
+                                                    hparam['batch_size'],
                                                     hparam['lr'])
 
             l_a2b, l_b2a = control.train(env, likelihood, hparam['nb_episode'])

@@ -13,7 +13,7 @@ def train(env, likelihood, nb_episode):
         old_s1, old_s2 = env.reset()
         while not done:
             a = env.sample_action()
-            (s1, s2), reward, done, _ = env.step(a)
+            (s1, s2), reward, done, _ = env.step(a, old_s1, old_s2)
             s.set_state(old_s1, old_s2, s1, s2, a)
             l1, l2 = likelihood.update(s)
             l_a2b[episode] = l1
@@ -62,7 +62,7 @@ class DynaQ:
             old_s1, old_s2 = self.env.reset()
             while not done:
                 a = self.q_learning.sample_action(old_s1, old_s2)
-                (s1, s2), reward, done, _ = self.env.step(a)
+                (s1, s2), reward, done, _ = self.env.step(a, old_s1, old_s2)
                 s.set_state(old_s1, old_s2, s1, s2, a)
                 self.q_learning.update(s, reward)
 

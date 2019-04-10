@@ -1,0 +1,11 @@
+{
+    "state_dim": 4,
+    "action_dim": 2,
+    "nb_episode": 1,
+    "nb_episode_adapt": 1,
+    "nb_run": 1,
+    "nb_step": 5,
+    "batch_size": 1,
+    "lr": 0.0005,
+    "output": "exp/"
+}
