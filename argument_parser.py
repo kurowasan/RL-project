@@ -21,6 +21,8 @@ def parse():
                         help='size of batches for training')
     parser.add_argument('--lr', type=float, default=1e-2,
                         help='learning rate')
+    parser.add_argument('--peak', type=int, default=10,
+                        help='sets the level of entropy for the environment distributions')
     # parser.add_argument('--optim', default='rmsprop',
     #                     help='type of optimizer')
     parser.add_argument('--output', default='exp1/',
