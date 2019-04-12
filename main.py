@@ -73,6 +73,7 @@ if __name__ == '__main__':
         else:
             likelihood = model.LikelihoodEstimators(hparam['state_dim'],
                                                     hparam['action_dim'],
+                                                    hparam['batch_size'],
                                                     hparam['lr'])
 
             l_a2b, l_b2a = control.train(env, likelihood, hparam['nb_episode'])

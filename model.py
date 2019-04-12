@@ -66,9 +66,9 @@ class EnvironmentModel:
 
 
 class LikelihoodEstimators:
-    def __init__(self, s, action_dim, lr):
-        self.model_a2b = ModelInterface(s, action_dim, 1, lr)
-        self.model_b2a = ModelInterface(s, action_dim, 2, lr)
+    def __init__(self, s, action_dim, batch_size, lr):
+        self.model_a2b = ModelInterface(s, action_dim, 1, batch_size, lr)
+        self.model_b2a = ModelInterface(s, action_dim, 2, batch_size, lr)
 
     def update(self, state):
         l_a2b = self.model_a2b.get_likelihood(state)
@@ -87,24 +87,29 @@ class LikelihoodEstimators:
 
 
 class ModelInterface:
-    def __init__(self, s, action_dim, a2b, lr=1e-4):
+    def __init__(self, s, action_dim, a2b, batch_size, lr=1e-4):
         cause = Cause(s,s,s, action_dim, a2b)
         effect = Effect(s,s,s,s, action_dim, a2b)
         self.a2b = a2b
         self.model = CausalModel(cause, effect)
         self.optim = optim.RMSprop(self.model.parameters(), lr=lr)
         self.nb_step = 0
+        self.batch_size = batch_size
 
     def reinitialize_optimizer(self, lr):
         self.optim = optim.RMSprop(self.model.parameters(), lr=lr)
 
+<<<<<<< HEAD
     def update(self, state, batch_size=100):
+=======
+    def update(self, state):
+>>>>>>> 3ee368504a60b2434826d60dca2a5da6f2eb4917
         if self.nb_step == 0:
             self.nll = torch.zeros(1)
         self.nb_step += 1
         self.model.train()
         self.nll += -self.model(state)
-        if self.nb_step % batch_size == 0:
+        if self.nb_step % self.batch_size == 0:
             self.nll.backward()
             self.optim.step()
             self.optim.zero_grad()
@@ -185,3 +190,96 @@ class Effect(nn.Module):
         cste = torch.logsumexp(self.w[:, old_s1, old_s2, node, a], dim=0)
 
         return self.w[s.get_effect(self.a2b)] - cste
+<<<<<<< HEAD
+=======
+
+
+class ModelJoint(nn.Module):
+    """This model simply models p and v jointly"""
+    def __init__(self, num_h_layers, num_h_units):
+        super(ModelJoint, self).__init__()
+        self.num_h_layers = num_h_layers
+        self.num_h_units = num_h_units
+
+        self.layers = nn.ModuleList()
+
+        for i in range(num_h_layers + 1):
+            in_dim, out_dim = self.num_h_units, self.num_h_units
+            if i == 0: in_dim = 5  # position, velocity, action 1, action 2, action 3 (one hot vector for action)
+            if i == num_h_layers: out_dim = 2 # position, velocity
+
+            self.layers.append(nn.Linear(in_dim, out_dim))
+
+        self.reset_parameters()
+
+    def forward(self, x):
+        """x is (batch_size, 5)"""
+        for i in range(self.num_h_layers + 1):
+            x = self.layers[i](x)
+            if i != self.num_h_layers: x = nn.functional.relu(x)
+
+        return x
+
+    def reset_parameters(self):
+        for layer in self.layers:
+            torch.nn.init.xavier_uniform_(layer.weight)
+
+
+class ModelCausal(nn.Module):
+    """This model models p and v with mechanisms, either with the correct or incorrect decomposition"""
+    def __init__(self, num_h_layers, num_h_units, correct=True):
+        super(ModelCausal, self).__init__()
+        self.num_h_layers = num_h_layers
+        self.num_h_units = num_h_units
+        self.correct = correct  # is it correct factorization?
+
+        self.layers1 = nn.ModuleList()
+        self.layers2 = nn.ModuleList()
+
+        for i in range(num_h_layers + 1):
+            in_dim, out_dim = self.num_h_units, self.num_h_units
+            if i == 0: in_dim = 5  # position, velocity, action 1, action 2, action 3 (one hot vector for action)
+            if i == num_h_layers: out_dim = 1  # if correct: new_velocity else: new_position
+            self.layers1.append(nn.Linear(in_dim, out_dim))
+
+        for i in range(num_h_layers + 1):
+            in_dim, out_dim = self.num_h_units, self.num_h_units
+            if i == 0: in_dim = 6  # position, velocity, action 1, action 2, action 3, {if correct: new_velocity else: new_position} (one hot vector for action)
+            if i == num_h_layers: out_dim = 1  # if correct: new_position else: new_velocity
+            self.layers2.append(nn.Linear(in_dim, out_dim))
+
+        self.reset_parameters()
+
+    def forward(self, x):
+        """x is (batch_size, 5)"""
+        tmp = x
+        for i in range(self.num_h_layers + 1):
+            tmp = self.layers1[i](tmp)
+            if i != self.num_h_layers: tmp = nn.functional.relu(tmp)
+
+        new_v_or_p = tmp
+        x = torch.cat([x, new_v_or_p], 1)
+
+        tmp = x
+        for i in range(self.num_h_layers + 1):
+            tmp = self.layers2[i](tmp)
+            if i != self.num_h_layers: tmp = nn.functional.relu(tmp)
+
+        new_p_or_v = tmp
+
+        if self.correct:
+            v = new_v_or_p
+            p = new_p_or_v
+        else:
+            v = new_p_or_v
+            p = new_v_or_p
+
+        return torch.cat([p, v], 1)
+
+    def reset_parameters(self):
+        for layer in self.layers1:
+            torch.nn.init.xavier_uniform_(layer.weight)
+
+        for layer in self.layers2:
+            torch.nn.init.xavier_uniform_(layer.weight)
+>>>>>>> 3ee368504a60b2434826d60dca2a5da6f2eb4917

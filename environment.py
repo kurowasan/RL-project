@@ -1,11 +1,12 @@
 import numpy as np
 
 class CausalEnvironment:
-    def __init__(self, state_dim=10, action_dim=4, n_step=100,
+    def __init__(self, state_dim=10, action_dim=4, n_step=100, peak = 10,
                  deterministic_reward=True):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.max_step = n_step
+        self.peak = peak
         self.reward = np.zeros((state_dim, state_dim, action_dim))
         self.deterministic_reward = deterministic_reward
 
@@ -32,11 +33,11 @@ class CausalEnvironment:
                                    self.state_dim, self.action_dim,
                                    self.state_dim))
 
-    def create_rv(self, dim, n, peak=10):
+    def create_rv(self, dim, n):
         # if peak is high (>1), the distribution
         # will have low entropy
         mass = np.ones(dim)
-        mass[np.random.randint(dim)] = peak
+        mass[np.random.randint(dim)] = self.peak
         return np.random.dirichlet(mass, n)
 
     def adapt_a(self):
