@@ -99,11 +99,7 @@ class ModelInterface:
     def reinitialize_optimizer(self, lr):
         self.optim = optim.RMSprop(self.model.parameters(), lr=lr)
 
-<<<<<<< HEAD
-    def update(self, state, batch_size=100):
-=======
     def update(self, state):
->>>>>>> 3ee368504a60b2434826d60dca2a5da6f2eb4917
         if self.nb_step == 0:
             self.nll = torch.zeros(1)
         self.nb_step += 1
@@ -190,8 +186,6 @@ class Effect(nn.Module):
         cste = torch.logsumexp(self.w[:, old_s1, old_s2, node, a], dim=0)
 
         return self.w[s.get_effect(self.a2b)] - cste
-<<<<<<< HEAD
-=======
 
 
 class ModelJoint(nn.Module):
@@ -282,4 +276,3 @@ class ModelCausal(nn.Module):
 
         for layer in self.layers2:
             torch.nn.init.xavier_uniform_(layer.weight)
->>>>>>> 3ee368504a60b2434826d60dca2a5da6f2eb4917
