@@ -13,11 +13,12 @@ def train(env, likelihood, nb_episode):
         old_s1, old_s2 = env.reset()
         while not done:
             a = env.sample_action()
-            (s1, s2), reward, done, _ = env.step(a)
+            (s1, s2), reward, done, _ = env.step(a, old_s1, old_s2)
             s.set_state(old_s1, old_s2, s1, s2, a)
             l1, l2 = likelihood.update(s)
-            l_a2b[episode] = l1
-            l_b2a[episode] = l2
+            real_likelihood = env.get_likelihood(old_s1, old_s2, s1, s2, a)
+            l_a2b[episode] = l1 # np.abs(real_likelihood - l1.detach().numpy())
+            l_b2a[episode] = l2 # np.abs(real_likelihood - l2.detach().numpy())
             old_s1, old_s2 = s1, s2
     return l_a2b, l_b2a
 
@@ -28,6 +29,11 @@ class DynaQ:
         self.env = env
         self.q_learning = TDLearning(env)
         self.reset_observation()
+
+    def reset(self):
+        self.q_learning = TDLearning(self.env)
+        self.reset_observation()
+        # self.model.reset()
 
     def update_observation(self, s):
         self.observation[s.s1, s.s2, s.a] = 1
@@ -55,14 +61,16 @@ class DynaQ:
         reward_list = np.zeros(nb_episode)
 
         for episode in range(nb_episode):
-            if episode % 100 == 0:
+            if episode % 10000 == 0 and episode > 0:
                 print(episode)
-                __import__('ipdb').set_trace()
+                # __import__('ipdb').set_trace()
+                print(self.env.s1[0,0,0,:])
+                print(utils.softmax(self.likelihood.model.cause.w[:,0,0,0].detach().numpy()))
             done = False
             old_s1, old_s2 = self.env.reset()
             while not done:
                 a = self.q_learning.sample_action(old_s1, old_s2)
-                (s1, s2), reward, done, _ = self.env.step(a)
+                (s1, s2), reward, done, _ = self.env.step(a, old_s1, old_s2)
                 s.set_state(old_s1, old_s2, s1, s2, a)
                 self.q_learning.update(s, reward)
 

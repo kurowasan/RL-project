@@ -19,8 +19,7 @@ class CausalEnvironment:
         elif reward_type == 'bern':
             self.reward = np.random.binomial(1, p=(0.1),
                                              size=(self.reward.shape))
-            self.reward *= 6
-            self.reward -= 1
+            self.reward *= 10
 
     def set_prob(self):
         self.action = self.create_rv(self.action_dim, 1)
@@ -88,6 +87,12 @@ class CausalEnvironment:
         else:
             done = False
         return (self.state_a, self.state_b), reward, done, 0
+
+    def get_likelihood(self, old_s1, old_s2, s1, s2, a):
+        p_a = self.s1[old_s1, old_s2, a, s1]
+        p_b_given_a = self.s2[old_s1, old_s2, s1, a, s2]
+        # __import__('ipdb').set_trace()
+        return np.log(p_a) + np.log(p_b_given_a)
 
 
 class State:
