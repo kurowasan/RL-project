@@ -57,7 +57,6 @@ class EnvironmentModel:
                 prob[s1 + s2*self.state_dim] = np.exp(l)
         if np.sum(prob) != 1:
             prob = prob/np.sum(prob)
-            # __import__('ipdb').set_trace()
         s = np.random.choice(np.arange(prob.shape[0]), p=prob)
         s1 = s % self.state_dim
         s2 = s // self.state_dim
@@ -158,12 +157,9 @@ class CausalModel(nn.Module):
 class Cause(nn.Module):
     def __init__(self, s1, s2, s3, a, a2b):
         super().__init__()
-        self.s1_size = s1
-        self.s2_size = s2
-        self.s3_size = s3
         self.a_size = a
         self.a2b = a2b
-        self.w = nn.Parameter(torch.zeros((s1, s2, s3, a)))
+        self.w = nn.Parameter(torch.zeros((s1, s2, s3, a))) # zeros
 
     def forward(self, s):
         cste = torch.logsumexp(self.w[:, s.old_s1, s.old_s2, s.a], dim=0)
@@ -173,18 +169,13 @@ class Cause(nn.Module):
 class Effect(nn.Module):
     def __init__(self, s1, s2, s3, s4, a, a2b):
         super().__init__()
-        self.s1_size = s1
-        self.s2_size = s2
-        self.s3_size = s3
-        self.s4_size = s4
         self.a_size = a
         self.a2b = a2b
-        self.w = nn.Parameter(torch.zeros((s1, s2, s3, s4, a)))
+        self.w = nn.Parameter(torch.zeros((s1, s2, s3, s4, a))) # zeros
 
     def forward(self, s):
         _, old_s1, old_s2, node, a = s.get_effect(self.a2b)
         cste = torch.logsumexp(self.w[:, old_s1, old_s2, node, a], dim=0)
-
         return self.w[s.get_effect(self.a2b)] - cste
 
 

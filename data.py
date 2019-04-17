@@ -15,8 +15,10 @@ class DataManager(object):
 
         self.data_x_slice, self.data_y_slice = None, None
 
-    def add(self, x, y):
-        bs = x.size(0)
+    def add(self, x, y, bs=None):
+
+        if bs is None:
+            bs = x.size(0)
 
         if self.cursor + bs <= self.max_samples:
             self.data_x[self.cursor: self.cursor + bs, :] = x

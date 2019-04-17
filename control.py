@@ -2,6 +2,42 @@ import numpy as np
 import environment
 import model
 import utils
+from data import DataManager
+from random import shuffle
+import copy
+
+def train_with_buffer(env, likelihood, nb_episode):
+    s = environment.State()
+    nb_total_step = nb_episode * env.max_step
+    buffer = []
+    l_a2b = np.zeros(nb_total_step)
+    l_b2a = np.zeros(nb_total_step)
+
+    # fill buffer
+    for episode in range(nb_episode):
+        done = False
+        old_s1, old_s2 = env.reset()
+        while not done:
+            a = env.sample_action_uniformly()
+            (s1, s2), reward, done, _ = env.step(a, old_s1, old_s2)
+            s.set_state(old_s1, old_s2, s1, s2, a)
+            buffer.append(copy.copy(s))
+            old_s1, old_s2 = s1, s2
+
+    shuffle(buffer)
+
+    # train
+    for i in range(nb_total_step):
+        s = buffer[i]
+        l1, l2 = likelihood.update(s)
+        real_likelihood = env.get_likelihood(s.old_s1, s.old_s2, s.s1, s.s2, s.a)
+        l_a2b[i] = np.abs(real_likelihood - l1.detach().numpy())
+        l_b2a[i] = np.abs(real_likelihood - l2.detach().numpy())
+
+        # l_a2b[i] = l1.detach().numpy()
+        # l_b2a[i] = l2.detach().numpy()
+
+    return l_a2b, l_b2a
 
 def train(env, likelihood, nb_episode):
     s = environment.State()
@@ -12,14 +48,17 @@ def train(env, likelihood, nb_episode):
         done = False
         old_s1, old_s2 = env.reset()
         while not done:
-            a = env.sample_action()
+            a = env.sample_action_uniformly()
             (s1, s2), reward, done, _ = env.step(a, old_s1, old_s2)
             s.set_state(old_s1, old_s2, s1, s2, a)
             l1, l2 = likelihood.update(s)
             real_likelihood = env.get_likelihood(old_s1, old_s2, s1, s2, a)
-            l_a2b[episode] = l1 # np.abs(real_likelihood - l1.detach().numpy())
-            l_b2a[episode] = l2 # np.abs(real_likelihood - l2.detach().numpy())
+            l_a2b[episode] += np.abs(real_likelihood - l1.detach().numpy())
+            l_b2a[episode] += np.abs(real_likelihood - l2.detach().numpy())
             old_s1, old_s2 = s1, s2
+
+        l_a2b[episode] /= 100
+        l_b2a[episode] /= 100
     return l_a2b, l_b2a
 
 class DynaQ:
