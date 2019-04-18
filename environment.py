@@ -21,6 +21,9 @@ class CausalEnvironment:
         elif reward_type == 'bern':
             self.reward = np.random.binomial(1, p=(0.1), size=(self.reward.shape))
             self.reward *= 10
+            reward = np.random.binomial(1, p=(0.1), size=(self.reward.shape))
+            reward *= -1000
+            self.reward += reward
 
     def set_prob(self):
         self.s1 = self.create_rv(self.state_dim, self.state_dim**2 * self.action_dim)

@@ -3,12 +3,18 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import environment
+import utils
 
 class EnvironmentModel:
-    def __init__(self, state_dim, action_dim, determinist_reward=True):
+    def __init__(self, state_dim, action_dim, a2b, batch_size, lr, determinist_reward=True):
         self.state_dim = state_dim
         self.action_dim = action_dim
+        self.a2b = a2b
+        self.batch_size = batch_size
+        self.lr = lr
         self.determinist_reward = determinist_reward
+        self.likelihood = ModelInterface(state_dim, action_dim, a2b, batch_size, lr)
+        self.reset_observation()
 
         if determinist_reward:
             self.reward_table = np.zeros((state_dim, state_dim, action_dim))
@@ -19,7 +25,35 @@ class EnvironmentModel:
             self.sum = np.zeros((state_dim, state_dim, action_dim))
             self.sum_sq = np.zeros((state_dim, state_dim, action_dim))
 
+    def update_observation(self, s):
+        self.observation[s.s1, s.s2, s.a] = 1
+
+    def reset_observation(self):
+        self.observation = np.zeros((self.state_dim, self.state_dim,
+                                     self.action_dim))
+
+    def sample_observation(self):
+        state_observed = np.sum(self.observation, axis=2)
+        idx = np.nonzero(state_observed)
+        choice = np.random.randint(len(idx[0]))
+        s1 = idx[0][choice]
+        s2 = idx[1][choice]
+        idx = np.nonzero(self.observation[s1, s2])
+        choice = np.random.randint(len(idx[0]))
+        a = int(self.observation[s1, s2, idx[0][choice]])
+        return s1, s2, a
+
+    def reinitialize_optimizer(self, lr):
+        self.lr = lr
+        self.likelihood.reinitialize_optimizer(lr)
+
     def update(self, s, reward):
+        l = self.likelihood.update(s)
+        self.update_observation(s)
+        self.update_reward(s, reward)
+        return l
+
+    def update_reward(self, s, reward):
         if self.determinist_reward:
             self.reward_table[s.old_s1, s.old_s2, s.a] = reward
         else:
@@ -47,13 +81,13 @@ class EnvironmentModel:
             reward = np.random.normal(mean, scale=std, size=1)
         return reward
 
-    def simulate(self, likelihood, old_s1, old_s2, a):
+    def simulate(self, old_s1, old_s2, a):
         prob = np.zeros((self.state_dim*self.state_dim))
         state = environment.State()
         for s1 in range(self.state_dim):
             for s2 in range(self.state_dim):
                 state.set_state(old_s1, old_s2, s1, s2, a)
-                l = likelihood.get_likelihood(state).detach().numpy()
+                l = self.likelihood.get_likelihood(state).detach().numpy()
                 prob[s1 + s2*self.state_dim] = np.exp(l)
         if np.sum(prob) != 1:
             prob = prob/np.sum(prob)
@@ -62,6 +96,37 @@ class EnvironmentModel:
         s2 = s // self.state_dim
         reward = self.sample_reward(s1, s2, a)
         return s1, s2, reward
+
+
+class TDLearning:
+    def __init__(self, env, TEMPERATURE=1, GAMMA=0.9, STEP_SIZE=0.25):
+        self.temperature = TEMPERATURE
+        self.gamma = GAMMA
+        self.step_size = STEP_SIZE
+        self.env = env
+        self.q = np.zeros((env.state_dim**2, env.action_dim))
+        self.learning_function = self.q_learning
+
+    def flatten_state(self, s1, s2):
+        return s1 + s2 * self.env.state_dim
+
+    def sample_action(self, s1, s2):
+        s = self.flatten_state(s1, s2)
+        pi = utils.softmax(self.q[s])
+        return np.random.choice(self.q.shape[1], 1, p=pi)[0]
+
+    def best_action(self, s):
+        return np.argmax(self.q[s])
+
+    def update(self, s, reward):
+        action = s.a
+        s_prime = self.flatten_state(s.s1, s.s2)
+        s = self.flatten_state(s.old_s1, s.old_s2)
+        self.learning_function(s, s_prime, action, reward)
+
+    def q_learning(self, s, s_prime, a, reward):
+        self.q[s, a] += self.step_size*(reward + \
+                        self.gamma*(np.max(self.q[s_prime])) - self.q[s, a])
 
 
 class LikelihoodEstimators:

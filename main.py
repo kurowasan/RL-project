@@ -9,8 +9,7 @@ import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
     hparam = arg.parse()
-    rl_mode = False
-
+    rl_mode = True
 
     nb_total_step = hparam['nb_episode'] * hparam['nb_step']
     likelihood_a2b = np.zeros((hparam['nb_run'], nb_total_step))
@@ -32,46 +31,39 @@ if __name__ == '__main__':
                                             hparam['peak'])
 
         if rl_mode:
-            likelihood_estimator_a2b = model.ModelInterface(hparam['state_dim'],
-                                                          hparam['action_dim'],
-                                                          True,
-                                                          hparam['lr'])
-            likelihood_estimator_b2a = model.ModelInterface(hparam['state_dim'],
-                                                          hparam['action_dim'],
-                                                          True,
-                                                          hparam['lr'])
-            env_model_a2b = model.EnvironmentModel(hparam['state_dim'],
-                                               hparam['action_dim'],
-                                               True)
-            env_model_b2a = model.EnvironmentModel(hparam['state_dim'],
-                                               hparam['action_dim'],
-                                               True)
-            dyna_a2b = control.DynaQ(env_model_a2b, likelihood_estimator_a2b, env)
-            dyna_b2a = control.DynaQ(env_model_b2a, likelihood_estimator_b2a, env)
+            model_a2b = model.EnvironmentModel(hparam['state_dim'], hparam['action_dim'], 1,
+                                               hparam['batch_size'], hparam['lr'], True)
+            model_b2a = model.EnvironmentModel(hparam['state_dim'], hparam['action_dim'], 2,
+                                               hparam['batch_size'], hparam['lr'], True)
 
-            l_a2b, r_a2b = dyna_a2b.train(hparam['nb_episode'], 1)
+            dyna_a2b = control.DynaQ(env, model_a2b)
+            dyna_b2a = control.DynaQ(env, model_b2a)
+
+            l_a2b, r_a2b = dyna_a2b.train(hparam['nb_episode'], 0)
             print('a->b finished')
-            l_b2a, r_b2a = dyna_b2a.train(hparam['nb_episode'], 1)
-            likelihood_a2b[run, :] = l_a2b
-            likelihood_b2a[run, :] = l_b2a
-            reward_a2b[run, :] = r_a2b
-            reward_b2a[run, :] = r_b2a
+            l_b2a, r_b2a = dyna_b2a.train(hparam['nb_episode'], 0)
+            print('b->a finished')
+            likelihood_a2b[run, :] = np.array(l_a2b)
+            likelihood_b2a[run, :] = np.array(l_b2a)
+            reward_a2b[run, :] = np.array(r_a2b)
+            reward_b2a[run, :] = np.array(r_b2a)
             print('Training finished')
 
             # reset all!
             env.adapt_a()
             dyna_a2b.reset()
             dyna_b2a.reset()
-            likelihood_estimator_a2b.reinitialize_optimizer(lr=1e-1)
-            likelihood_estimator_b2a.reinitialize_optimizer(lr=1e-1)
+            model_a2b.reinitialize_optimizer(lr=1e-1)
+            model_b2a.reinitialize_optimizer(lr=1e-1)
 
             l_a2b, r_a2b = dyna_a2b.train(hparam['nb_episode_adapt'], 1)
             print('a->b finished')
             l_b2a, r_b2a = dyna_b2a.train(hparam['nb_episode_adapt'], 1)
-            likelihood_a2b_adapt[run, :] = l_a2b
-            likelihood_b2a_adapt[run, :] = l_b2a
-            reward_a2b_adapt[run, :] = r_a2b
-            reward_b2a_adapt[run, :] = r_b2a
+            print('b->a finished')
+            likelihood_a2b_adapt[run, :] = np.array(l_a2b)
+            likelihood_b2a_adapt[run, :] = np.array(l_b2a)
+            reward_a2b_adapt[run, :] = np.array(r_a2b)
+            reward_b2a_adapt[run, :] = np.array(r_b2a)
 
         else:
             likelihood = model.LikelihoodEstimators(hparam['state_dim'],
@@ -79,24 +71,13 @@ if __name__ == '__main__':
                                                     hparam['batch_size'],
                                                     hparam['lr'])
 
-            # env.compare_directions(likelihood)
-            # __import__('ipdb').set_trace()
-
-
-
             l_a2b, l_b2a = control.train_with_buffer(env, likelihood, hparam['nb_episode'])
             likelihood_a2b[run, :] = l_a2b
             likelihood_b2a[run, :] = l_b2a
             print('Training finished')
-            # __import__('ipdb').set_trace()
 
-            env.compare_likelihood(likelihood, 0, 0, 0, 0, 0)
-            env.compare_likelihood(likelihood, 1, 0, 0, 0, 0)
-            env.compare_likelihood(likelihood, 2, 0, 0, 0, 0)
-            env.compare_likelihood(likelihood, 3, 0, 0, 0, 0)
+            test(env, likelihood)
             env.adapt_a()
-            # env.compare_directions(likelihood)
-            # __import__('ipdb').set_trace()
 
             likelihood.reinitialize_optimizer(lr=1e-2)
             l_a2b, l_b2a = control.train_with_buffer(env, likelihood, hparam['nb_episode_adapt'])
@@ -114,3 +95,11 @@ if __name__ == '__main__':
 
     utils.plot_training(likelihood_a2b, likelihood_b2a, hparam['output'], True)
     utils.plot_adaptation(likelihood_a2b_adapt, likelihood_b2a_adapt, hparam['output'], True)
+
+def test(env, likelihood):
+    env.compare_directions(likelihood)
+    env.compare_likelihood(likelihood, 0, 0, 0, 0, 0)
+    env.compare_likelihood(likelihood, 1, 0, 0, 0, 0)
+    env.compare_likelihood(likelihood, 2, 0, 0, 0, 0)
+    env.compare_likelihood(likelihood, 3, 0, 0, 0, 0)
+    __import__('ipdb').set_trace()

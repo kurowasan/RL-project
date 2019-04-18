@@ -4,29 +4,32 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
 
-def random_walk(env):
+def random_walk_from_every_start(env):
     nb_state_visited = np.zeros((env.state_dim, env.state_dim))
 
     for i in range(env.state_dim):
         for j in range(env.state_dim):
-            old_s1 = i
-            old_s2 = j
-            observed_states = []
-            done = False
-            env.reset()
-            while not done:
-                a = env.sample_action_uniformly()
-                (s1, s2), reward, done, _ = env.step(a, old_s1, old_s2)
-                observed_states.append(s1 + s2*env.state_dim)
-                old_s1, old_s2 = s1, s2
-            print(observed_states[:10])
+            observed_states = random_walk(env, i, j)
             nb_state_visited[i, j] = len(set(observed_states))
 
     return nb_state_visited
 
+def random_walk(self, env, old_s1=None, old_s2=None):
+    if old_s1 is None and old_s2 is None:
+        old_s1, old_s2 = env.reset()
+    observed_states = []
+    done = False
+    env.reset()
+    while not done:
+        a = env.sample_action_uniformly()
+        (s1, s2), reward, done, _ = env.step(a, old_s1, old_s2)
+        observed_states.append(s1 + s2*env.state_dim)
+        old_s1, old_s2 = s1, s2
+    return observed_states
+
 def test_ergodicity(env, hparam):
     env.max_step = 1000
-    state_visited = random_walk(env)
+    state_visited = random_walk_from_every_start(env)
     print(f'nb states:{env.state_dim**2}')
     print(state_visited)
     plt.imshow(state_visited, cmap='hot', interpolation='nearest')
