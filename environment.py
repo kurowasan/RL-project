@@ -1,18 +1,36 @@
 import numpy as np
 import utils
+from abstractgraph import SparseGraphEnvironment
 
 class CausalEnvironment:
     def __init__(self, state_dim=10, action_dim=4, n_step=100, peak = 10,
-                 deterministic_reward=True):
+                 deterministic_reward=True, graph_traversal=True, 
+                 correct_path_proportion = 0.6, branching_prob = 0.75, output = './'):
         self.state_dim = state_dim
+
         self.action_dim = action_dim
         self.max_step = n_step
         self.peak = peak
         self.reward = np.zeros((state_dim, state_dim, action_dim))
+        self.final_reward = 10
+        self.action_reward = -1
+        self.correct_path_reward = 1
         self.deterministic_reward = deterministic_reward
 
         self.set_prob()
-        self.set_reward_function()
+        if graph_traversal:
+            self.graph_env = SparseGraphEnvironment(nb_nodes=self.state_dim, correct_path_proportion = correct_path_proportion, 
+                branching_prob = branching_prob, nb_actions = self.action_dim)
+            np.save(output+'adjacency.npy',self.graph_env.adjacency)
+            self.s1 = np.einsum('ijkl,il->ijkl',self.s1,self.graph_env.adjacency)
+            self.s2 = np.einsum('ijklm,ik->ijklm',self.s2,self.graph_env.adjacency)
+            self.normalize()
+
+            self.set_reward_function(reward_type='graph_traversal') ##TODO
+
+        else:
+            self.set_reward_function()
+
         self.reset()
 
     def set_reward_function(self, reward_type='bern'):
@@ -24,6 +42,20 @@ class CausalEnvironment:
             reward = np.random.binomial(1, p=(0.1), size=(self.reward.shape))
             reward *= -1000
             self.reward += reward
+        elif reward_type == 'graph_traversal':
+            self.reward+=(self.action_reward)
+
+            for i in self.graph_env.correct_path[:-1]:
+                for j in self.graph_env.correct_path[1:]:
+                    action = np.argmax(self.graph_env.transition[i,j])
+                    self.reward[i,j,action]+=self.correct_path_reward
+
+            ### setting the end reward
+
+            end_i, end_a = np.nonzero(self.graph_env.transition[:,self.action_dim-1,:])
+            for i in end_i:
+                for a in end_a:
+                    self.reward[i,self.action_dim-1,a]+=self.final_reward
 
     def set_prob(self):
         self.s1 = self.create_rv(self.state_dim, self.state_dim**2 * self.action_dim)
@@ -48,6 +80,23 @@ class CausalEnvironment:
             mass[np.random.randint(dim)] = self.peak
             distr[i] = np.random.dirichlet(mass, 1)
         return distr
+
+    def normalize(self):
+        for i in np.arange(self.s1.shape[0]):
+            for j in np.arange(self.s1.shape[1]):
+                for k in np.arange(self.s1.shape[2]):
+                    if np.sum(self.s1[i,j,k])>0:
+                        self.s1[i,j,k]/=np.sum(self.s1[i,j,k])
+
+
+        for i in np.arange(self.s2.shape[0]):
+            for j in np.arange(self.s2.shape[1]):
+                for k in np.arange(self.s2.shape[2]):
+                    for l in np.arange(self.s2.shape[3]):
+                        if np.sum(self.s2[i,j,k,l])>0:
+                            self.s2[i,j,k,l]/=np.sum(self.s2[i,j,k,l])
+
+
 
     def sample_action_uniformly(self):
         return np.random.randint(self.action_dim)
