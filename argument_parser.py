@@ -12,7 +12,7 @@ def parse():
                         help='number of episode used for training')
     parser.add_argument('--nb-episode-adapt', type=int, default=50,
                         help='number of episode used for adaptation')
-    parser.add_argument('--nb-run', type=int, default=5,
+    parser.add_argument('--nb-run', type=int, default=1,
                         help='number of independent run')
     parser.add_argument('--nb-step', type=int, default=20,
                         help='length of episodes')
