@@ -2,7 +2,7 @@ import numpy as np
 
 class SparseGraphEnvironment(object):
     """Environment with a sparse path through a graph"""
-    def __init__(self, state_dim=10, correct_path_proportion = 0.2, branching_prob = 1.0, nb_actions = 4, arborescent = False):
+    def __init__(self, state_dim=10, correct_path_proportion = 0.2, branching_prob = 1.0, nb_actions = 4, arborescent = True):
         super(SparseGraphEnvironment, self).__init__()
         self.nb_nodes = state_dim*state_dim
         self.correct_path_proportion = correct_path_proportion
@@ -76,13 +76,27 @@ class SparseGraphEnvironment(object):
         ### creating the first level of alternative paths
         used_nodes = [i for i in np.arange(self.nb_nodes) if i in self.correct_path]
         not_used_yet = [i for i in np.arange(self.nb_nodes-1) if i not in used_nodes]
-        current_level_nodes = [correct_path[0]]
+        
 
-        for current_level in xrange(len(self.correct_path)):
+        current_tree_level = 0
+        while len(not_used_yet)>0:
+            current_level_nodes.append(correct_path[current_tree_level])
+            donors = []
+            acceptors = []
+
             for node in current_level_nodes:
-                number_of_children = np.random.randint(2,self.nb_actions-1)
+                ### pick children
+                nb_children = np.random.randint(2,self.nb_actions-1)
+                children = np.random.permutation(not_used_yet)[:nb_children]
+                ### add children to the acceptor node list
+                acceptors+=children
+                donors+=(list(np.ones(nb_children) * node))
 
-        ###creating a tree of 
+            self.add_edges(donors,acceptors)
+            used_nodes+=list(donors)
+            not_used_yet = [i for i in np.arange(self.nb_nodes-1) if i not in used_nodes]
+            current_level_nodes = acceptors
+        current_tree_level+=1 #keeping track of the correct path
 
         return self.adjacency
 
