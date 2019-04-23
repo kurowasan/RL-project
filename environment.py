@@ -3,27 +3,28 @@ import utils
 from abstractgraph import SparseGraphEnvironment
 
 class CausalEnvironment:
-    def __init__(self, state_dim=10, action_dim=4, n_step=100, peak = 10,
+    def __init__(self, state_dim=10, action_dim=4, n_step=100, peak=10,
                  deterministic_reward=True, graph_traversal=True,
-                 correct_path_proportion = 0.6, branching_prob=0.8, output = './'):
+                 correct_path_proportion=0.6, branching_prob=0.9, output='./'):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.max_step = n_step
         self.peak = peak
-        self.reward = np.zeros((state_dim, state_dim, action_dim))
+        self.reward = np.zeros((state_dim*state_dim, state_dim*state_dim, action_dim))
         self.deterministic_reward = deterministic_reward
 
         self.set_prob()
-        self.final_reward = 10
+        self.final_reward = 1000
         self.action_reward = -1
-        self.correct_path_reward = 1
+        self.correct_path_reward = 10
 
 
         if graph_traversal:
-            self.graph_env = SparseGraphEnvironment(nb_nodes=state_dim, correct_path_proportion=correct_path_proportion, branching_prob=branching_prob, nb_actions=action_dim)
+            self.graph_env = SparseGraphEnvironment(state_dim, correct_path_proportion=correct_path_proportion, branching_prob=branching_prob, nb_actions=action_dim)
             # np.save(output+'adjacency.npy', self.graph_env.adjacency)
-            print(self.mask.shape)
-            __import__('ipdb').set_trace()
+            self.mask = self.graph_env.transition.reshape((state_dim, state_dim,
+                                                           state_dim, state_dim,
+                                                           action_dim))
             self.apply_mask_s1(self.mask)
             self.apply_mask_s2(self.mask)
             self.set_reward_function(reward_type='graph_traversal') ##TODO
@@ -89,8 +90,9 @@ class CausalEnvironment:
                                    self.state_dim, self.action_dim,
                                    self.state_dim))
 
-    def divide_prob(self, a, b, axis):
+    def divide_prob(self, a, b, axis, eps=1e-16):
         b = np.expand_dims(b, axis=axis)
+        b[b == 0] = eps
         return a/b
 
     def get_marginal_mask(self, joint_mask):
@@ -126,11 +128,15 @@ class CausalEnvironment:
         self.s2 = np.multiply(self.s2, mask_s2)
         self.normalize_s2()
 
-    def normalize_s1(self):
-        self.s1 /= np.sum(self.s1, axis=-1)[:,:,:,np.newaxis]
+    def normalize_s1(self, eps=1e-16):
+        denom = np.sum(self.s1, axis=-1)[:,:,:,np.newaxis]
+        denom[denom == 0] = eps
+        self.s1 /= denom
 
-    def normalize_s2(self):
-        self.s2 /= np.sum(self.s2, axis=-1)[:,:,:,:,np.newaxis]
+    def normalize_s2(self, eps=1e-16):
+        denom = np.sum(self.s2, axis=-1)[:,:,:,:,np.newaxis]
+        denom[denom == 0] = eps
+        self.s2 /= denom
 
     def adapt_a(self):
         self.s1 = self.create_rv(self.state_dim, self.state_dim**2 * self.action_dim)
