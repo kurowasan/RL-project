@@ -2,9 +2,9 @@ import numpy as np
 
 class SparseGraphEnvironment(object):
     """Environment with a sparse path through a graph"""
-    def __init__(self, nb_nodes=10, correct_path_proportion = 0.2, branching_prob = 1.0, nb_actions = 4):
+    def __init__(self, state_dim=10, correct_path_proportion = 0.2, branching_prob = 1.0, nb_actions = 4, arborescent = False):
         super(SparseGraphEnvironment, self).__init__()
-        self.nb_nodes = nb_nodes
+        self.nb_nodes = state_dim*state_dim
         self.correct_path_proportion = correct_path_proportion
         self.branching_prob = branching_prob
         self.nb_actions = nb_actions
@@ -21,7 +21,10 @@ class SparseGraphEnvironment(object):
         ## creating the adjacency matrix
         self.adjacency = np.zeros((self.nb_nodes,self.nb_nodes))
 
-        self.make_paths()
+        if arborescent:
+            self.make_tree()
+        else:
+            self.make_paths()
 
         self.make_transition()
 
@@ -49,6 +52,7 @@ class SparseGraphEnvironment(object):
         used_nodes = [i for i in np.arange(self.nb_nodes) if i in self.correct_path]
         not_used_yet = [i for i in np.arange(self.nb_nodes-1) if i not in used_nodes]
 
+
         while len(not_used_yet)>0:
             potential_acceptors = self.get_usable_nodes(self.adjacency)    
             to_add = np.random.permutation(not_used_yet)[:int(np.ceil(len(not_used_yet)*self.branching_prob))]
@@ -63,6 +67,25 @@ class SparseGraphEnvironment(object):
             self.add_edges(to_add,acceptors)    
             not_used_yet = [i for i in np.arange(self.nb_nodes-1) if i not in used_nodes]
         return self.adjacency
+
+    def make_tree(self):
+        pass
+
+        self.add_edges(self.correct_path[:-1], self.correct_path[1:])
+
+        ### creating the first level of alternative paths
+        used_nodes = [i for i in np.arange(self.nb_nodes) if i in self.correct_path]
+        not_used_yet = [i for i in np.arange(self.nb_nodes-1) if i not in used_nodes]
+        current_level_nodes = [correct_path[0]]
+
+        for current_level in xrange(len(self.correct_path)):
+            for node in current_level_nodes:
+                number_of_children = np.random.randint(2,self.nb_actions-1)
+
+        ###creating a tree of 
+
+        return self.adjacency
+
 
     def make_transition(self):
 
