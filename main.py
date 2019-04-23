@@ -29,12 +29,11 @@ if __name__ == '__main__':
                                             hparam['action_dim'],
                                             hparam['nb_step'],
                                             hparam['peak'])
-        utils.test_ergodicity(env, hparam)
-        __import__('ipdb').set_trace()
+        # utils.test_ergodicity(env, hparam)
 
         if rl_mode:
-            reward_random = utils.random_walk(env, hparam['nb_episode'])
-            print(f'Reward for random walk: {np.sum(reward_random)}')
+            # reward_random = utils.random_walk(env, hparam['nb_episode'])
+            # print(f'Reward for random walk: {np.sum(reward_random)}')
 
             model_a2b = model.EnvironmentModel(hparam['state_dim'], hparam['action_dim'], 1,
                                                hparam['batch_size'], hparam['lr'], True)
@@ -62,10 +61,10 @@ if __name__ == '__main__':
             print(reward_a2b.shape)
             print(f'Reward First half r_a2b:{np.sum(reward_a2b[0,:half])} and r_b2a:{np.sum(reward_b2a[0,:half])}')
             print(f'Reward Second half r_a2b:{np.sum(reward_a2b[0,half:])} and r_b2a:{np.sum(reward_b2a[0,half:])}')
-            plt.plot(utils.moving_average(reward_a2b[0]), label='model free')
-            plt.plot(utils.moving_average(reward_b2a[0]), label='DynaQ')
-            plt.legend()
-            plt.show()
+            # plt.plot(utils.moving_average(reward_a2b[0]), label='model free')
+            # plt.plot(utils.moving_average(reward_b2a[0]), label='DynaQ')
+            # plt.legend()
+            # plt.show()
             # __import__('ipdb').set_trace()
 
             # reset all!
@@ -81,9 +80,9 @@ if __name__ == '__main__':
             model_a2b.reinitialize_optimizer(lr=1e-1)
             model_b2a.reinitialize_optimizer(lr=1e-1)
 
-            l_a2b, r_a2b = dyna_a2b.train(hparam['nb_episode_adapt'], 1)
+            l_a2b, r_a2b = dyna_a2b.train(hparam['nb_episode_adapt'], 0)
             print('a->b finished')
-            l_b2a, r_b2a = dyna_b2a.train(hparam['nb_episode_adapt'], 1)
+            l_b2a, r_b2a = dyna_b2a.train(hparam['nb_episode_adapt'], 0)
             print('b->a finished')
             likelihood_a2b_adapt[run, :] = np.array(l_a2b)
             likelihood_b2a_adapt[run, :] = np.array(l_b2a)
@@ -113,8 +112,8 @@ if __name__ == '__main__':
     if rl_mode:
         reward_a2b = np.cumsum(reward_a2b, axis=1)
         reward_b2a = np.cumsum(reward_b2a, axis=1)
-        reward_a2b_adapt = np.cumsum(reward_a2b_adapt, axis=1) + reward_a2b[:,-1]
-        reward_b2a_adapt = np.cumsum(reward_b2a_adapt, axis=1) + reward_b2a[:,-1]
+        reward_a2b_adapt = np.cumsum(reward_a2b_adapt, axis=1)
+        reward_b2a_adapt = np.cumsum(reward_b2a_adapt, axis=1)
         utils.plot_reward(reward_a2b, reward_b2a, hparam['output'], True)
         utils.plot_reward_adapt(reward_a2b_adapt, reward_b2a_adapt, hparam['output'], True)
 

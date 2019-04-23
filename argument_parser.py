@@ -4,23 +4,23 @@ import argparse
 
 def parse():
     parser = argparse.ArgumentParser(description='Causal RL experiments')
-    parser.add_argument('--state-dim', type=int, default=4,
+    parser.add_argument('--state-dim', type=int, default=10,
                         help='number of value each state can take')
     parser.add_argument('--action-dim', type=int, default=2,
                         help='number of possible actions')
-    parser.add_argument('--nb-episode', type=int, default=1000,
+    parser.add_argument('--nb-episode', type=int, default=500,
                         help='number of episode used for training')
-    parser.add_argument('--nb-episode-adapt', type=int, default=100,
+    parser.add_argument('--nb-episode-adapt', type=int, default=50,
                         help='number of episode used for adaptation')
-    parser.add_argument('--nb-run', type=int, default=1,
+    parser.add_argument('--nb-run', type=int, default=5,
                         help='number of independent run')
-    parser.add_argument('--nb-step', type=int, default=100,
+    parser.add_argument('--nb-step', type=int, default=20,
                         help='length of episodes')
     parser.add_argument('--batch-size', type=int, default=10,
                         help='size of batches for training')
     parser.add_argument('--lr', type=float, default=1e-2,
                         help='learning rate')
-    parser.add_argument('--peak', type=int, default=2,
+    parser.add_argument('--peak', type=int, default=1,
                         help='level of entropy for the environment distributions')
     parser.add_argument('--output', default='exp_first_test_dyna/',
                         help='Relative path where the result will be logged')
