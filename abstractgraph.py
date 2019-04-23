@@ -10,7 +10,7 @@ class SparseGraphEnvironment(object):
         self.nb_actions = nb_actions
         self.start = 0
         self.end = self.nb_nodes-1
-        self.transition = np.zeros((nb_nodes, nb_nodes, nb_actions))
+        self.transition = np.zeros((self.nb_nodes, self.nb_nodes, self.nb_actions))
 
         ## fixing the first and last nodes as start and end
         ## making a random path of 60% of other nodes - this is the path to learn
@@ -27,6 +27,7 @@ class SparseGraphEnvironment(object):
             self.make_paths()
 
         self.make_transition()
+        import pdb; pdb.set_trace()
 
     def add_edges(self,from_node,to_node):
         for i,j in zip(from_node, to_node):
@@ -79,30 +80,38 @@ class SparseGraphEnvironment(object):
         
 
         current_tree_level = 0
+        current_level_nodes = []
         while len(not_used_yet)>0:
-            current_level_nodes.append(correct_path[current_tree_level])
+            #import pdb; pdb.set_trace()
+            current_level_nodes.append(self.correct_path[current_tree_level])
             donors = []
             acceptors = []
 
             for node in current_level_nodes:
+                if len(not_used_yet)==0:
+                    break
                 ### pick children
                 nb_children = np.random.randint(2,self.nb_actions-1)
                 children = np.random.permutation(not_used_yet)[:nb_children]
+                
                 ### add children to the acceptor node list
-                acceptors+=children
-                donors+=(list(np.ones(nb_children) * node))
 
+                acceptors+=list(children)
+                donors+=list(np.ones(nb_children).astype('int') * node)
+                used_nodes+=list(donors)
+                used_nodes+=list(acceptors)
+                used_nodes = list(set(used_nodes))
+                not_used_yet = [i for i in np.arange(self.nb_nodes-1) if i not in used_nodes]    
+                print(len(used_nodes))
             self.add_edges(donors,acceptors)
-            used_nodes+=list(donors)
             not_used_yet = [i for i in np.arange(self.nb_nodes-1) if i not in used_nodes]
             current_level_nodes = acceptors
-        current_tree_level+=1 #keeping track of the correct path
+            current_tree_level+=1 #keeping track of the correct path
 
         return self.adjacency
 
 
     def make_transition(self):
-
         for i in np.arange(self.adjacency.shape[0]):
             
             j_nodes = np.nonzero(self.adjacency[i])[0]
