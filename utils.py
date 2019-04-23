@@ -4,17 +4,9 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
 
-def random_walk_from_every_start(env):
-    nb_state_visited = np.zeros((env.state_dim, env.state_dim))
-
-    for i in range(env.state_dim):
-        for j in range(env.state_dim):
-            observed_states = random_walk(env, i, j)
-            nb_state_visited[i, j] = len(set(observed_states))
-
-    return nb_state_visited
-
-def random_walk(self, env, old_s1=None, old_s2=None):
+def random_walk_episode(env, old_s1=None, old_s2=None):
+    i = 0
+    reward_array = np.zeros((env.max_step))
     if old_s1 is None and old_s2 is None:
         old_s1, old_s2 = env.reset()
     observed_states = []
@@ -25,17 +17,36 @@ def random_walk(self, env, old_s1=None, old_s2=None):
         (s1, s2), reward, done, _ = env.step(a, old_s1, old_s2)
         observed_states.append(s1 + s2*env.state_dim)
         old_s1, old_s2 = s1, s2
-    return observed_states
+        reward_array[i] = reward
+        i += 1
+    return observed_states, reward
+
+def random_walk_from_every_start(env):
+    nb_state_visited = np.zeros((env.state_dim, env.state_dim))
+
+    for i in range(env.state_dim):
+        for j in range(env.state_dim):
+            observed_states, _ = random_walk_episode(env, i, j)
+            nb_state_visited[i, j] = len(set(observed_states))
+
+    return nb_state_visited
+
+def random_walk(env, nb_episode):
+    reward = np.zeros((nb_episode, env.max_step))
+    for episode in range(nb_episode):
+        _, r = random_walk_episode(env)
+        reward[episode] = r
+    return reward
 
 def test_ergodicity(env, hparam):
-    env.max_step = 1000
+    env.max_step = 10000
     state_visited = random_walk_from_every_start(env)
     print(f'nb states:{env.state_dim**2}')
     print(state_visited)
     plt.imshow(state_visited, cmap='hot', interpolation='nearest')
     plt.show()
 
-def moving_average(a, n=100) :
+def moving_average(a, n=20) :
     ret = np.cumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
     return ret[n - 1:] / n

@@ -8,13 +8,13 @@ def parse():
                         help='number of value each state can take')
     parser.add_argument('--action-dim', type=int, default=2,
                         help='number of possible actions')
-    parser.add_argument('--nb-episode', type=int, default=100,
+    parser.add_argument('--nb-episode', type=int, default=1000,
                         help='number of episode used for training')
-    parser.add_argument('--nb-episode-adapt', type=int, default=20,
+    parser.add_argument('--nb-episode-adapt', type=int, default=100,
                         help='number of episode used for adaptation')
     parser.add_argument('--nb-run', type=int, default=1,
                         help='number of independent run')
-    parser.add_argument('--nb-step', type=int, default=500,
+    parser.add_argument('--nb-step', type=int, default=100,
                         help='length of episodes')
     parser.add_argument('--batch-size', type=int, default=10,
                         help='size of batches for training')

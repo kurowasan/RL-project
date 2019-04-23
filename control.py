@@ -110,9 +110,11 @@ class DynaQ:
     def simulate(self):
         s = environment.State()
         old_s1, old_s2, a = self.model.sample_observation()
-        s1, s2, reward = self.model.simulate(old_s1, old_s2, a)
+        s1, s2, reward, confidence_level = self.model.simulate(old_s1, old_s2, a, self.env)
+        #TODO: remove self.env
         s.set_state(old_s1, old_s2, s1, s2, a)
-        self.q_learning.update(s, reward)
+        if confidence_level > 0.25:
+            self.q_learning.update(s, reward)
 
     def print_info(self, episode):
         print(episode)

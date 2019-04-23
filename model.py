@@ -15,6 +15,7 @@ class EnvironmentModel:
         self.determinist_reward = determinist_reward
         self.likelihood = ModelInterface(state_dim, action_dim, a2b, batch_size, lr)
         self.reset_observation()
+        self.simulation_total = 0
 
         if determinist_reward:
             self.reward_table = np.zeros((state_dim, state_dim, action_dim))
@@ -81,21 +82,30 @@ class EnvironmentModel:
             reward = np.random.normal(mean, scale=std, size=1)
         return reward
 
-    def simulate(self, old_s1, old_s2, a):
+    def simulate(self, old_s1, old_s2, a, env):
+        self.simulation_total += 1
         prob = np.zeros((self.state_dim*self.state_dim))
         state = environment.State()
+        #TODO: keep values for same step...
         for s1 in range(self.state_dim):
             for s2 in range(self.state_dim):
                 state.set_state(old_s1, old_s2, s1, s2, a)
                 l = self.likelihood.get_likelihood(state).detach().numpy()
                 prob[s1 + s2*self.state_dim] = np.exp(l)
+
         if np.sum(prob) != 1:
             prob = prob/np.sum(prob)
         s = np.random.choice(np.arange(prob.shape[0]), p=prob)
         s1 = s % self.state_dim
         s2 = s // self.state_dim
+        confidence_level = np.amax(prob)
+        if confidence_level > 0.5:
+            print(f'Prob max:{np.amax(prob)}')
+            print(f'simulation result: ({s1}, {s2})')
+            print(env.step(a, old_s1, old_s2))
+            # __import__('ipdb').set_trace()
         reward = self.sample_reward(s1, s2, a)
-        return s1, s2, reward
+        return s1, s2, reward, confidence_level
 
 
 class TDLearning:

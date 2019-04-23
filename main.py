@@ -29,8 +29,13 @@ if __name__ == '__main__':
                                             hparam['action_dim'],
                                             hparam['nb_step'],
                                             hparam['peak'])
+        utils.test_ergodicity(env, hparam)
+        __import__('ipdb').set_trace()
 
         if rl_mode:
+            reward_random = utils.random_walk(env, hparam['nb_episode'])
+            print(f'Reward for random walk: {np.sum(reward_random)}')
+
             model_a2b = model.EnvironmentModel(hparam['state_dim'], hparam['action_dim'], 1,
                                                hparam['batch_size'], hparam['lr'], True)
             model_b2a = model.EnvironmentModel(hparam['state_dim'], hparam['action_dim'], 2,
@@ -49,8 +54,28 @@ if __name__ == '__main__':
             reward_b2a[run, :] = np.array(r_b2a)
             print('Training finished')
 
+            r_a2b = np.sum(reward_a2b)
+            r_b2a = np.sum(reward_b2a)
+            print(f'Reward r_a2b:{r_a2b} and r_b2a:{r_b2a}')
+            half = int(reward_a2b.shape[1]/2)
+            print(half)
+            print(reward_a2b.shape)
+            print(f'Reward First half r_a2b:{np.sum(reward_a2b[0,:half])} and r_b2a:{np.sum(reward_b2a[0,:half])}')
+            print(f'Reward Second half r_a2b:{np.sum(reward_a2b[0,half:])} and r_b2a:{np.sum(reward_b2a[0,half:])}')
+            plt.plot(utils.moving_average(reward_a2b[0]), label='model free')
+            plt.plot(utils.moving_average(reward_b2a[0]), label='DynaQ')
+            plt.legend()
+            plt.show()
+            # __import__('ipdb').set_trace()
+
             # reset all!
             env.adapt_a()
+            # print('Test ergodicity')
+            # utils.test_ergodicity(env, hparam)
+            # __import__('ipdb').set_trace()
+
+
+
             dyna_a2b.reset()
             dyna_b2a.reset()
             model_a2b.reinitialize_optimizer(lr=1e-1)

@@ -4,34 +4,57 @@ from abstractgraph import SparseGraphEnvironment
 
 class CausalEnvironment:
     def __init__(self, state_dim=10, action_dim=4, n_step=100, peak = 10,
-                 deterministic_reward=True, graph_traversal=True, 
-                 correct_path_proportion = 0.6, branching_prob = 0.75, output = './'):
+                 deterministic_reward=True, graph_traversal=True,
+                 correct_path_proportion = 0.6, branching_prob=0.8, output = './'):
         self.state_dim = state_dim
-
         self.action_dim = action_dim
         self.max_step = n_step
         self.peak = peak
         self.reward = np.zeros((state_dim, state_dim, action_dim))
-        self.final_reward = 10
-        self.action_reward = -1
-        self.correct_path_reward = 1
         self.deterministic_reward = deterministic_reward
 
         self.set_prob()
+        self.final_reward = 10
+        self.action_reward = -1
+        self.correct_path_reward = 1
+
+
         if graph_traversal:
-            self.graph_env = SparseGraphEnvironment(nb_nodes=self.state_dim, correct_path_proportion = correct_path_proportion, 
-                branching_prob = branching_prob, nb_actions = self.action_dim)
-            np.save(output+'adjacency.npy',self.graph_env.adjacency)
-            self.s1 = np.einsum('ijkl,il->ijkl',self.s1,self.graph_env.adjacency)
-            self.s2 = np.einsum('ijklm,ik->ijklm',self.s2,self.graph_env.adjacency)
-            self.normalize()
-
+            self.graph_env = SparseGraphEnvironment(nb_nodes=state_dim, correct_path_proportion=correct_path_proportion, branching_prob=branching_prob, nb_actions=action_dim)
+            # np.save(output+'adjacency.npy', self.graph_env.adjacency)
+            print(self.mask.shape)
+            __import__('ipdb').set_trace()
+            self.apply_mask_s1(self.mask)
+            self.apply_mask_s2(self.mask)
             self.set_reward_function(reward_type='graph_traversal') ##TODO
-
         else:
             self.set_reward_function()
 
         self.reset()
+
+    def add_one_per_column(self, column, nb_one):
+        s = self.state_dim
+        if column == 4:
+            a, b = self.state_dim, self.action_dim
+        else:
+            b, a = self.state_dim, self.action_dim
+
+        for i in range(s):
+            for j in range(s):
+                for k in range(s):
+                    for l in range(a):
+                        idx = np.random.choice(b, nb_one, replace=False)
+                        for one in range(nb_one):
+                            if column == 0:
+                                self.joint_edges[idx[one],i,j,k,l] = 1
+                            elif column == 1:
+                                self.joint_edges[i,idx[one],j,k,l] = 1
+                            elif column == 2:
+                                self.joint_edges[i,j,idx[one],k,l] = 1
+                            elif column == 3:
+                                self.joint_edges[i,j,k,idx[one],l] = 1
+                            elif column == 4:
+                                self.joint_edges[i,j,k,l,idx[one]] = 1
 
     def set_reward_function(self, reward_type='bern'):
         if reward_type == 'normal':
@@ -43,19 +66,18 @@ class CausalEnvironment:
             reward *= -1000
             self.reward += reward
         elif reward_type == 'graph_traversal':
-            self.reward+=(self.action_reward)
+            self.reward += self.action_reward
 
             for i in self.graph_env.correct_path[:-1]:
                 for j in self.graph_env.correct_path[1:]:
-                    action = np.argmax(self.graph_env.transition[i,j])
-                    self.reward[i,j,action]+=self.correct_path_reward
+                    action = np.argmax(self.graph_env.transition[i, j])
+                    self.reward[i, j, action] += self.correct_path_reward
 
             ### setting the end reward
-
             end_i, end_a = np.nonzero(self.graph_env.transition[:,self.action_dim-1,:])
             for i in end_i:
                 for a in end_a:
-                    self.reward[i,self.action_dim-1,a]+=self.final_reward
+                    self.reward[i, self.action_dim-1, a]+=self.final_reward
 
     def set_prob(self):
         self.s1 = self.create_rv(self.state_dim, self.state_dim**2 * self.action_dim)
@@ -67,9 +89,53 @@ class CausalEnvironment:
                                    self.state_dim, self.action_dim,
                                    self.state_dim))
 
+    def divide_prob(self, a, b, axis):
+        b = np.expand_dims(b, axis=axis)
+        return a/b
+
+    def get_marginal_mask(self, joint_mask):
+        # old_s1, old_s2, s1, s2, a
+        mask = np.sum(joint_mask, axis=3)
+        mask_cond = np.sum(mask, axis=2)
+        marginal_mask = self.divide_prob(mask, mask_cond, -2)
+        return marginal_mask
+
+    def get_cond_mask(self, joint_mask):
+        # old_s1, old_s2, s1, s2, a
+        mask_cond = np.sum(joint_mask, axis=3)
+        cond_mask = self.divide_prob(joint_mask, mask_cond, -2)
+        return cond_mask
+
+    def reshape_s1(self, joint_mask):
+        mask_s1 = self.get_marginal_mask(joint_mask)
+        mask_s1 = np.moveaxis(mask_s1, -1, -2)
+        return mask_s1
+
+    def reshape_s2(self, joint_mask):
+        mask_s2 = self.get_cond_mask(joint_mask)
+        mask_s2 = np.moveaxis(mask_s2, -1, -2)
+        return mask_s2
+
+    def apply_mask_s1(self, joint_mask):
+        mask_s1 = self.reshape_s1(joint_mask)
+        self.s1 = np.multiply(self.s1, mask_s1)
+        self.normalize_s1()
+
+    def apply_mask_s2(self, joint_mask):
+        mask_s2 = self.reshape_s2(joint_mask)
+        self.s2 = np.multiply(self.s2, mask_s2)
+        self.normalize_s2()
+
+    def normalize_s1(self):
+        self.s1 /= np.sum(self.s1, axis=-1)[:,:,:,np.newaxis]
+
+    def normalize_s2(self):
+        self.s2 /= np.sum(self.s2, axis=-1)[:,:,:,:,np.newaxis]
+
     def adapt_a(self):
         self.s1 = self.create_rv(self.state_dim, self.state_dim**2 * self.action_dim)
         self.s1 = self.s1.reshape((self.state_dim, self.state_dim, self.action_dim, self.state_dim))
+        self.apply_mask_s1(self.mask)
 
     def create_rv(self, dim, n):
         # if peak is high (>1), the distribution
@@ -80,22 +146,6 @@ class CausalEnvironment:
             mass[np.random.randint(dim)] = self.peak
             distr[i] = np.random.dirichlet(mass, 1)
         return distr
-
-    def normalize(self):
-        for i in np.arange(self.s1.shape[0]):
-            for j in np.arange(self.s1.shape[1]):
-                for k in np.arange(self.s1.shape[2]):
-                    if np.sum(self.s1[i,j,k])>0:
-                        self.s1[i,j,k]/=np.sum(self.s1[i,j,k])
-
-
-        for i in np.arange(self.s2.shape[0]):
-            for j in np.arange(self.s2.shape[1]):
-                for k in np.arange(self.s2.shape[2]):
-                    for l in np.arange(self.s2.shape[3]):
-                        if np.sum(self.s2[i,j,k,l])>0:
-                            self.s2[i,j,k,l]/=np.sum(self.s2[i,j,k,l])
-
 
 
     def sample_action_uniformly(self):
@@ -140,7 +190,10 @@ class CausalEnvironment:
     def get_likelihood(self, old_s1, old_s2, s1, s2, a):
         p_a = self.s1[old_s1, old_s2, a, s1]
         p_b_given_a = self.s2[old_s1, old_s2, s1, a, s2]
-        return np.log(p_a) + np.log(p_b_given_a)
+        if p_a <= 0 or p_b_given_a <= 0:
+            return np.log(1e-8)
+        else:
+            return np.log(p_a) + np.log(p_b_given_a)
 
     def compare_directions(self, likelihood):
         ab = []
@@ -160,14 +213,12 @@ class CausalEnvironment:
                             p_ab[i,j,:,k,l] = joint[i,j,:,k,l] / np.sum(joint[i,j,:,k,l])
                             #np.sum(joint, axis=2)[None,:,:,:]
             joint2 = np.einsum('ijmk,ijlmk->ijlmk', p_b, p_ab)
-            # __import__('ipdb').set_trace()
 
             p_a_tilde = np.ones(self.s1.shape) * 1/8
             p_ba_tilde = np.ones(self.s2.shape) * 1/8
             p_b_tilde = np.ones(p_b.shape) * 1/8
             p_ab_tilde = np.ones(p_ab.shape) * 1/8
 
-            # __import__('ipdb').set_trace()
             diff_ab = np.linalg.norm(p_a - 1/dim)
             diff_p_ba = np.linalg.norm(p_ba - 1/dim)
             diff_ba = np.linalg.norm(p_b - 1/dim)
