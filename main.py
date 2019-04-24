@@ -12,16 +12,17 @@ if __name__ == '__main__':
     rl_mode = True
 
     nb_total_step = hparam['nb_episode'] * hparam['nb_step']
-    likelihood_a2b = np.zeros((hparam['nb_run'], nb_total_step))
-    likelihood_b2a = np.zeros((hparam['nb_run'], nb_total_step))
-    reward_a2b = np.zeros((hparam['nb_run'], nb_total_step))
-    reward_b2a = np.zeros((hparam['nb_run'], nb_total_step))
+    likelihood_a2b = np.zeros((hparam['nb_run'], hparam['nb_episode']))
+    likelihood_b2a = np.zeros((hparam['nb_run'], hparam['nb_episode']))
+    reward_a2b = np.zeros((hparam['nb_run'], hparam['nb_episode']))
+    reward_b2a = np.zeros((hparam['nb_run'], hparam['nb_episode']))
 
     nb_total_step = hparam['nb_episode_adapt'] * hparam['nb_step']
-    likelihood_a2b_adapt = np.zeros((hparam['nb_run'], nb_total_step))
-    likelihood_b2a_adapt = np.zeros((hparam['nb_run'], nb_total_step))
-    reward_a2b_adapt = np.zeros((hparam['nb_run'], nb_total_step))
-    reward_b2a_adapt = np.zeros((hparam['nb_run'], nb_total_step))
+    likelihood_a2b_adapt = np.zeros((hparam['nb_run'], hparam['nb_episode_adapt']))
+    likelihood_b2a_adapt = np.zeros((hparam['nb_run'], hparam['nb_episode_adapt']))
+    reward_a2b_adapt = np.zeros((hparam['nb_run'], hparam['nb_episode_adapt']))
+    reward_b2a_adapt = np.zeros((hparam['nb_run'], hparam['nb_episode_adapt']))
+
 
     for run in range(hparam['nb_run']):
         print(f'run #{run}')
@@ -29,28 +30,27 @@ if __name__ == '__main__':
                                             hparam['action_dim'],
                                             hparam['nb_step'],
                                             hparam['peak'])
-        # utils.test_ergodicity(env, hparam)
 
         if rl_mode:
-            # reward_random = utils.random_walk(env, hparam['nb_episode'])
-            # print(f'Reward for random walk: {np.sum(reward_random)}')
+            reward_random = utils.random_walk(env, hparam['nb_episode'])
+            print(f'Reward for random walk: {np.sum(reward_random)} for episode: {hparam["nb_episode"]}')
 
             model_a2b = model.EnvironmentModel(hparam['state_dim'], hparam['action_dim'], 1,
                                                hparam['batch_size'], hparam['lr'], True)
             model_b2a = model.EnvironmentModel(hparam['state_dim'], hparam['action_dim'], 2,
                                                hparam['batch_size'], hparam['lr'], True)
 
-            dyna_a2b = control.DynaQ(env, model_a2b, hparam['confidence_thershold'])
-            dyna_b2a = control.DynaQ(env, model_b2a, hparam['confidence_thershold'])
+            dyna_a2b = control.DynaQ(env, model_a2b, hparam['confidence_threshold'])
+            dyna_b2a = control.DynaQ(env, model_b2a, hparam['confidence_threshold'])
 
             l_a2b, r_a2b = dyna_a2b.train(hparam['nb_episode'], hparam['nb_simulation'])
             print('a->b finished')
             l_b2a, r_b2a = dyna_b2a.train(hparam['nb_episode'], hparam['nb_simulation'])
             print('b->a finished')
-            likelihood_a2b[run, :] = np.array(l_a2b)
-            likelihood_b2a[run, :] = np.array(l_b2a)
-            reward_a2b[run, :] = np.array(r_a2b)
-            reward_b2a[run, :] = np.array(r_b2a)
+            likelihood_a2b[run, :] = l_a2b
+            likelihood_b2a[run, :] = l_b2a
+            reward_a2b[run, :] = r_a2b
+            reward_b2a[run, :] = r_b2a
             print('Training finished')
 
             r_a2b = np.sum(reward_a2b)
@@ -59,21 +59,16 @@ if __name__ == '__main__':
             half = int(reward_a2b.shape[1]/2)
             print(half)
             print(reward_a2b.shape)
-            print(f'Reward First half r_a2b:{np.sum(reward_a2b[0,:half])} and r_b2a:{np.sum(reward_b2a[0,:half])}')
-            print(f'Reward Second half r_a2b:{np.sum(reward_a2b[0,half:])} and r_b2a:{np.sum(reward_b2a[0,half:])}')
+            print(f'Reward First half r_a2b:{np.sum(reward_a2b[run,:half])} and r_b2a:{np.sum(reward_b2a[run,:half])}')
+            print(f'Reward Second half r_a2b:{np.sum(reward_a2b[run,half:])} and r_b2a:{np.sum(reward_b2a[run,half:])}')
             # plt.plot(utils.moving_average(reward_a2b[0]), label='model free')
             # plt.plot(utils.moving_average(reward_b2a[0]), label='DynaQ')
             # plt.legend()
             # plt.show()
-            # __import__('ipdb').set_trace()
 
             # reset all!
             env.adapt_a()
             # print('Test ergodicity')
-            # utils.test_ergodicity(env, hparam)
-            # __import__('ipdb').set_trace()
-
-
 
             dyna_a2b.reset()
             dyna_b2a.reset()

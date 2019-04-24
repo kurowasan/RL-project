@@ -14,10 +14,9 @@ class CausalEnvironment:
         self.deterministic_reward = deterministic_reward
 
         self.set_prob()
-        self.final_reward = 1000
+        self.final_reward = 100
         self.action_reward = -1
         self.correct_path_reward = 10
-
 
         if graph_traversal:
             self.graph_env = SparseGraphEnvironment(state_dim, correct_path_proportion=correct_path_proportion, branching_prob=branching_prob, nb_actions=action_dim)
@@ -25,37 +24,18 @@ class CausalEnvironment:
             self.mask = self.graph_env.transition.reshape((state_dim, state_dim,
                                                            state_dim, state_dim,
                                                            action_dim))
-            self.apply_mask_s1(self.mask)
-            self.apply_mask_s2(self.mask)
+            self.s1 = self.reshape_s1(self.mask)
+            self.s2 = self.reshape_s2(self.mask)
+            # self.normalize_s1()
+            # self.normalize_s2()
+
+            # self.apply_mask_s1(self.mask)
+            # self.apply_mask_s2(self.mask)
             self.set_reward_function(reward_type='graph_traversal') ##TODO
         else:
             self.set_reward_function()
 
         self.reset()
-
-    def add_one_per_column(self, column, nb_one):
-        s = self.state_dim
-        if column == 4:
-            a, b = self.state_dim, self.action_dim
-        else:
-            b, a = self.state_dim, self.action_dim
-
-        for i in range(s):
-            for j in range(s):
-                for k in range(s):
-                    for l in range(a):
-                        idx = np.random.choice(b, nb_one, replace=False)
-                        for one in range(nb_one):
-                            if column == 0:
-                                self.joint_edges[idx[one],i,j,k,l] = 1
-                            elif column == 1:
-                                self.joint_edges[i,idx[one],j,k,l] = 1
-                            elif column == 2:
-                                self.joint_edges[i,j,idx[one],k,l] = 1
-                            elif column == 3:
-                                self.joint_edges[i,j,k,idx[one],l] = 1
-                            elif column == 4:
-                                self.joint_edges[i,j,k,l,idx[one]] = 1
 
     def set_reward_function(self, reward_type='bern'):
         if reward_type == 'normal':
@@ -64,7 +44,7 @@ class CausalEnvironment:
             self.reward = np.random.binomial(1, p=(0.1), size=(self.reward.shape))
             self.reward *= 10
             reward = np.random.binomial(1, p=(0.1), size=(self.reward.shape))
-            reward *= -1000
+            reward *= -100
             self.reward += reward
         elif reward_type == 'graph_traversal':
             self.reward += self.action_reward
@@ -72,13 +52,12 @@ class CausalEnvironment:
             for i in self.graph_env.correct_path[:-1]:
                 for j in self.graph_env.correct_path[1:]:
                     action = np.argmax(self.graph_env.transition[i, j])
-                    self.reward[i, j, action] += self.correct_path_reward
+                    self.reward[i, j, action] = self.correct_path_reward
 
             ### setting the end reward
-            end_i, end_a = np.nonzero(self.graph_env.transition[:,self.action_dim-1,:])
-            for i in end_i:
-                for a in end_a:
-                    self.reward[i, self.action_dim-1, a]+=self.final_reward
+            end_i, end_a = np.nonzero(self.graph_env.transition[:,self.state_dim**2-1,:])
+            for i,a in zip(end_i, end_a):
+                self.reward[i, self.state_dim**2-1, a] = self.final_reward
 
     def set_prob(self):
         self.s1 = self.create_rv(self.state_dim, self.state_dim**2 * self.action_dim)
@@ -139,9 +118,13 @@ class CausalEnvironment:
         self.s2 /= denom
 
     def adapt_a(self):
-        self.s1 = self.create_rv(self.state_dim, self.state_dim**2 * self.action_dim)
-        self.s1 = self.s1.reshape((self.state_dim, self.state_dim, self.action_dim, self.state_dim))
-        self.apply_mask_s1(self.mask)
+        # self.s1 = self.create_rv(self.state_dim, self.state_dim**2 * self.action_dim)
+        # self.s1 = self.s1.reshape((self.state_dim, self.state_dim, self.action_dim, self.state_dim))
+        # self.apply_mask_s1(self.mask)
+        idx = np.where(self.s1 > 0)
+        for i in range(len(idx[0])):
+            self.s1[idx[0][i], idx[1][i], idx[2][i], idx[3][i]] = np.random.randint(5)
+        self.normalize_s1()
 
     def create_rv(self, dim, n):
         # if peak is high (>1), the distribution
@@ -153,9 +136,9 @@ class CausalEnvironment:
             distr[i] = np.random.dirichlet(mass, 1)
         return distr
 
-
     def sample_action_uniformly(self):
-        return np.random.randint(self.action_dim)
+        action = np.random.randint(self.action_dim)
+        return action
 
     def sample_state_uniformly(self):
         return np.random.randint(self.state_dim)
@@ -187,7 +170,7 @@ class CausalEnvironment:
 
         self.n_step += 1
         reward = self.sample_reward(self.state_a, self.state_b, action)
-        if self.n_step >= self.max_step:
+        if self.n_step >= self.max_step or reward == self.final_reward:
             done = True
         else:
             done = False

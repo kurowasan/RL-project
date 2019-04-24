@@ -19,7 +19,7 @@ def random_walk_episode(env, old_s1=None, old_s2=None):
         old_s1, old_s2 = s1, s2
         reward_array[i] = reward
         i += 1
-    return observed_states, reward
+    return observed_states, reward_array
 
 def random_walk_from_every_start(env):
     nb_state_visited = np.zeros((env.state_dim, env.state_dim))
@@ -39,7 +39,7 @@ def random_walk(env, nb_episode):
     return reward
 
 def test_ergodicity(env, hparam):
-    env.max_step = 10000
+    env.max_step = 100000
     state_visited = random_walk_from_every_start(env)
     print(f'nb states:{env.state_dim**2}')
     print(state_visited)

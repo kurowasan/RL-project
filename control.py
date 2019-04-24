@@ -80,13 +80,15 @@ class DynaQ:
 
         if buffer_size is None:
             buffer_size = int(nb_episode/10)
+            print(f'buffer_size: {buffer_size}')
         buffer = self._fill_buffer(buffer_size)
 
-        likelihood_list = []
-        reward_list = []
+        likelihood_list = np.zeros(nb_episode)
+        reward_list = np.zeros(nb_episode)
+        episode = 0
 
         for _ in range(10):
-            for i in range(len(buffer)):
+            for i in range(buffer_size):
                 s = buffer[i]
                 new = np.random.randint(10)
                 if new < 1:
@@ -100,10 +102,11 @@ class DynaQ:
                     for _ in range(nb_simulation):
                         self.simulate()
 
-                    real_likelihood = self.env.get_likelihood(s.old_s1, s.old_s2, s.s1, s.s2, s.a)
-                    l = self.model.likelihood.get_likelihood(s)
-                    likelihood_list.append(np.abs(real_likelihood - l.detach().numpy()))
-                reward_list.append(reward)
+                real_likelihood = self.env.get_likelihood(s.old_s1, s.old_s2, s.s1, s.s2, s.a)
+                l = self.model.likelihood.get_likelihood(s)
+                likelihood_list[episode] += np.abs(real_likelihood - l.detach().numpy())
+                reward_list[episode] += reward
+                episode += 1
             shuffle(buffer)
 
         return likelihood_list, reward_list

@@ -4,32 +4,28 @@ import argparse
 
 def parse():
     parser = argparse.ArgumentParser(description='Causal RL experiments')
-    parser.add_argument('--state-dim', type=int, default=10,
+    parser.add_argument('--state-dim', type=int, default=20,
                         help='number of value each state can take')
     parser.add_argument('--action-dim', type=int, default=4,
                         help='number of possible actions')
-    parser.add_argument('--nb-episode', type=int, default=1000,
+    parser.add_argument('--nb-episode', type=int, default=10000,
                         help='number of episode used for training')
-    parser.add_argument('--nb-episode-adapt', type=int, default=100,
+    parser.add_argument('--nb-episode-adapt', type=int, default=1000,
                         help='number of episode used for adaptation')
     parser.add_argument('--nb-run', type=int, default=1,
                         help='number of independent run')
     parser.add_argument('--nb-step', type=int, default=20,
                         help='length of episodes')
     parser.add_argument('--epsilon', type=float, default=0.1,
-                        help='epsilon for the normalisation')    
-    
+                        help='epsilon for the normalisation')
 
-    parser.add_argument('--confidence-thershold', type=float, default=0.25,
+    parser.add_argument('--confidence-threshold', type=float, default=0.25,
                         help='confidence threshold for the DynaQ simulation')
-    
-
-
-    parser.add_argument('--nb-simulation', type=int, default=0, 
+    parser.add_argument('--nb-simulation', type=int, default=0,
                         help='number of simulations in DynaQ')
     parser.add_argument('--batch-size', type=int, default=10,
                         help='size of batches for training')
-    parser.add_argument('--lr', type=float, default=1e-2,
+    parser.add_argument('--lr', type=float, default=1e-1,
                         help='learning rate')
     parser.add_argument('--peak', type=int, default=1,
                         help='level of entropy for the environment distributions')
