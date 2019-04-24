@@ -3,7 +3,7 @@ import numpy as np
 class SparseGraphEnvironment(object):
     """Environment with a sparse path through a graph"""
     def __init__(self, state_dim=10, correct_path_proportion = 0.2,
-                 branching_prob = 1.0, nb_actions = 4, arborescent = False):
+                 branching_prob = 1.0, nb_actions = 4, arborescent = True):
         super(SparseGraphEnvironment, self).__init__()
         self.nb_nodes = state_dim*state_dim
         self.correct_path_proportion = correct_path_proportion

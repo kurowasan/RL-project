@@ -109,6 +109,9 @@ if __name__ == '__main__':
             likelihood_b2a_adapt[run, :] = l_b2a
 
 
+    utils.plot_training(likelihood_a2b, likelihood_b2a, hparam['output'], True)
+    utils.plot_adaptation(likelihood_a2b_adapt, likelihood_b2a_adapt, hparam['output'], True)
+
     if rl_mode:
         reward_a2b = np.cumsum(reward_a2b, axis=1)
         reward_b2a = np.cumsum(reward_b2a, axis=1)
@@ -117,8 +120,6 @@ if __name__ == '__main__':
         utils.plot_reward(reward_a2b, reward_b2a, hparam['output'], True)
         utils.plot_reward_adapt(reward_a2b_adapt, reward_b2a_adapt, hparam['output'], True)
 
-    utils.plot_training(likelihood_a2b, likelihood_b2a, hparam['output'], True)
-    utils.plot_adaptation(likelihood_a2b_adapt, likelihood_b2a_adapt, hparam['output'], True)
 
 def test(env, likelihood):
     env.compare_directions(likelihood)
