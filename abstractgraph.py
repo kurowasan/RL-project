@@ -113,19 +113,23 @@ class SparseGraphEnvironment(object):
 
 
     def make_transition(self):
-        for i in np.arange(self.adjacency.shape[0]):
-            #import pdb; pdb.set_trace()
-            j_nodes = np.nonzero(self.adjacency[i])[0]
-            max_actions = len(j_nodes)
-            if max_actions>1:
-                for a in np.arange(max_actions):
-                    j = j_nodes[a]
-                    correct_prob = np.random.uniform(0.5,1)
-                    self.transition[i,j,a]+=correct_prob
-                    for b in j_nodes:
-                        if not j_nodes[a]==b:
-                            self.transition[i,b,a]+=((1-correct_prob)/(len(j_nodes)-1))
 
-            else:
-                j = j_nodes[0]
-                self.transition[i,j,0]+=1
+        for i in np.arange(self.adjacency.shape[0]):
+            j_nodes = np.nonzero(self.adjacency[i])[0]
+            
+            for a in np.arange(self.nb_actions):
+                
+                if a < len(j_nodes): ### checking if it's a valid action
+                    j = j_nodes[a]
+                    if len(j_nodes)==1: ### if the total number of actions is one
+                        self.transition[i,j,a]+=1
+                    else: ### more than one action possible
+                        correct_prob = np.random.uniform(0.9,1)
+                        self.transition[i,j,a]+=correct_prob
+                        for b in j_nodes:
+                            if not j_nodes[a]==b:
+                                self.transition[i,b,a]+=((1-correct_prob)/(len(j_nodes)-1))
+                else:
+                    ### return to same node
+                    self.transition[i,i,a]+=1
+        self.transition/=np.sum(self.transition)        
