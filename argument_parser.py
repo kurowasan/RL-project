@@ -16,6 +16,17 @@ def parse():
                         help='number of independent run')
     parser.add_argument('--nb-step', type=int, default=20,
                         help='length of episodes')
+    parser.add_argument('--epsilon', type=float, default=0.1,
+                        help='epsilon for the normalisation')    
+    
+
+    parser.add_argument('--confidence-thershold', type=float, default=0.25,
+                        help='confidence threshold for the DynaQ simulation')
+    
+
+
+    parser.add_argument('--nb-simulation', type=int, default=0, 
+                        help='number of simulations in DynaQ')
     parser.add_argument('--batch-size', type=int, default=10,
                         help='size of batches for training')
     parser.add_argument('--lr', type=float, default=1e-2,

@@ -40,12 +40,12 @@ if __name__ == '__main__':
             model_b2a = model.EnvironmentModel(hparam['state_dim'], hparam['action_dim'], 2,
                                                hparam['batch_size'], hparam['lr'], True)
 
-            dyna_a2b = control.DynaQ(env, model_a2b)
-            dyna_b2a = control.DynaQ(env, model_b2a)
+            dyna_a2b = control.DynaQ(env, model_a2b, hparam['confidence_thershold'])
+            dyna_b2a = control.DynaQ(env, model_b2a, hparam['confidence_thershold'])
 
-            l_a2b, r_a2b = dyna_a2b.train(hparam['nb_episode'], 0)
+            l_a2b, r_a2b = dyna_a2b.train(hparam['nb_episode'], hparam['nb_simulation'])
             print('a->b finished')
-            l_b2a, r_b2a = dyna_b2a.train(hparam['nb_episode'], 0)
+            l_b2a, r_b2a = dyna_b2a.train(hparam['nb_episode'], hparam['nb_simulation'])
             print('b->a finished')
             likelihood_a2b[run, :] = np.array(l_a2b)
             likelihood_b2a[run, :] = np.array(l_b2a)
@@ -80,9 +80,9 @@ if __name__ == '__main__':
             model_a2b.reinitialize_optimizer(lr=1e-1)
             model_b2a.reinitialize_optimizer(lr=1e-1)
 
-            l_a2b, r_a2b = dyna_a2b.train(hparam['nb_episode_adapt'], 0)
+            l_a2b, r_a2b = dyna_a2b.train(hparam['nb_episode_adapt'], hparam['nb_simulation'])
             print('a->b finished')
-            l_b2a, r_b2a = dyna_b2a.train(hparam['nb_episode_adapt'], 0)
+            l_b2a, r_b2a = dyna_b2a.train(hparam['nb_episode_adapt'], hparam['nb_simulation'])
             print('b->a finished')
             likelihood_a2b_adapt[run, :] = np.array(l_a2b)
             likelihood_b2a_adapt[run, :] = np.array(l_b2a)

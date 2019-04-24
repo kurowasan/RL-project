@@ -63,10 +63,11 @@ def train(env, likelihood, nb_episode):
 
 
 class DynaQ:
-    def __init__(self, env, env_model=None):
+    def __init__(self, env, env_model=None, confidence_threshold = 0.25):
         self.env = env
         self.model = env_model
         self.q_learning = model.TDLearning(env)
+        self.confidence_threshold = confidence_threshold
 
     def reset(self):
         self.q_learning = model.TDLearning(self.env)
@@ -113,7 +114,7 @@ class DynaQ:
         s1, s2, reward, confidence_level = self.model.simulate(old_s1, old_s2, a, self.env)
         #TODO: remove self.env
         s.set_state(old_s1, old_s2, s1, s2, a)
-        if confidence_level > 0.25:
+        if confidence_level > self.confidence_threshold:
             self.q_learning.update(s, reward)
 
     def print_info(self, episode):
