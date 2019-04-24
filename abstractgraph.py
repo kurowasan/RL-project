@@ -117,6 +117,15 @@ class SparseGraphEnvironment(object):
             #import pdb; pdb.set_trace()
             j_nodes = np.nonzero(self.adjacency[i])[0]
             max_actions = len(j_nodes)
-            for a in np.arange(max_actions):
-                j = j_nodes[a]
-                self.transition[i,j,a]+=1
+            if max_actions>1:
+                for a in np.arange(max_actions):
+                    j = j_nodes[a]
+                    correct_prob = np.random.uniform(0.5,1)
+                    self.transition[i,j,a]+=correct_prob
+                    for b in j_nodes:
+                        if not j_nodes[a]==b:
+                            self.transition[i,b,a]+=((1-correct_prob)/(len(j_nodes)-1))
+
+            else:
+                j = j_nodes[0]
+                self.transition[i,j,0]+=1
