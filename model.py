@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import environment
+from approximators import FastTileCoding
 
 class EnvironmentModel:
     def __init__(self, state_dim, action_dim, determinist_reward=True):
@@ -275,3 +276,214 @@ class ModelCausal(nn.Module):
 
         for layer in self.layers2:
             torch.nn.init.xavier_uniform_(layer.weight)
+
+
+class TileCoding_Joint(nn.Module):
+    def __init__(self, num_actions, num_bins, num_tilings, limits):
+        super(TileCoding_Joint, self).__init__()
+
+        self.tile_codings_p = nn.ModuleList()
+        self.tile_codings_v = nn.ModuleList()
+        for _ in range(num_actions):
+            self.tile_codings_p.append(TileCoding(num_bins, num_tilings, limits))
+            self.tile_codings_v.append(TileCoding(num_bins, num_tilings, limits))
+
+    def forward(self, state):
+        bs = state.size(0)
+        p_v = state[:, :2].detach().cpu().numpy()
+        action_one_hot = state[:, 2:].byte()
+        action = torch.masked_select(torch.arange(3), action_one_hot).detach().cpu().numpy()
+
+        ps = []
+        vs = []
+        for i in range(bs):
+            ps.append(self.tile_codings_p[action[i]](p_v[i]).unsqueeze(0))
+            vs.append(self.tile_codings_v[action[i]](p_v[i]).unsqueeze(0))
+
+        p_vs = [torch.cat(ps).unsqueeze(1), torch.cat(vs).unsqueeze(1)]
+        return torch.cat(p_vs, 1)
+
+
+class FastTileCoding_Joint(nn.Module):
+    def __init__(self, num_actions, num_bins, num_tilings, limits, optimizer=None):
+        super(FastTileCoding_Joint, self).__init__()
+        self.num_actions = num_actions
+        self.tile_codings_p = nn.ModuleList()
+        self.tile_codings_v = nn.ModuleList()
+        self.tile_codings_r = nn.ModuleList()
+
+        for _ in range(num_actions):
+            self.tile_codings_p.append(FastTileCoding(num_bins, num_tilings, limits))
+            self.tile_codings_v.append(FastTileCoding(num_bins, num_tilings, limits))
+            self.tile_codings_r.append(FastTileCoding(num_bins, num_tilings, limits))
+
+        self.optimizer = optimizer
+
+    def forward(self, state, action=None):
+        p_min, p_max = self.tile_codings_p[0].limits[0, 0], self.tile_codings_p[0].limits[0, 1]
+        v_min, v_max = self.tile_codings_p[0].limits[1, 0], self.tile_codings_p[0].limits[1, 1]
+        if action is None:
+            p_primes = []
+            v_primes = []
+            r_primes = []
+            for a in range(self.num_actions):
+                if state[a].size(0) > 0:
+                    p_v = state[a][:, :2]
+                    p = p_v[:, :1]
+                    v = p_v[:, 1:]
+                    p_delta = self.tile_codings_p[a](p_v)
+                    v_delta = self.tile_codings_v[a](p_v)
+                    r_prime = self.tile_codings_r[a](p_v)
+                    p_primes.append(torch.clamp(p + p_delta, p_min, p_max))
+                    v_primes.append(torch.clamp(v + v_delta, v_min, v_max))
+                    r_primes.append(r_prime)
+            p_primes = torch.cat(p_primes, 0)
+            v_primes = torch.cat(v_primes, 0)
+            r_primes = torch.cat(r_primes, 0)
+
+            return torch.cat([p_primes, v_primes, r_primes], 1)
+        else:
+            p_v = state[:, :2]
+            p, v = state[:,:1], state[:, 1:2]
+            p_delta = self.tile_codings_p[action](p_v)
+            v_delta = self.tile_codings_v[action](p_v)
+            r_prime = self.tile_codings_r[action](p_v)
+            p_prime = torch.clamp(p + p_delta, p_min, p_max)
+            v_prime = torch.clamp(v + v_delta, v_min, v_max)
+
+            return torch.cat([p_prime, v_prime, r_prime], 1)
+
+class FastTileCoding_Causal(nn.Module):
+    def __init__(self, num_actions, num_bins, num_tilings, limits, optimizer=None):
+        super(FastTileCoding_Causal, self).__init__()
+        self.num_actions = num_actions
+        self.tile_codings_p = nn.ModuleList()
+        self.tile_codings_v = nn.ModuleList()
+        self.tile_codings_r = nn.ModuleList()
+        for _ in range(num_actions):
+            self.tile_codings_p.append(FastTileCoding(int(num_bins ** (2/3)), num_tilings, np.concatenate([limits, limits[1:]], 0)))
+            self.tile_codings_v.append(FastTileCoding(num_bins, num_tilings, limits))
+            self.tile_codings_r.append(FastTileCoding(num_bins, num_tilings, limits))
+
+        self.optimizer = optimizer
+
+    def forward(self, state, action=None):
+        p_min, p_max = self.tile_codings_p[0].limits[0, 0], self.tile_codings_p[0].limits[0, 1]
+        v_min, v_max = self.tile_codings_p[0].limits[1,0], self.tile_codings_p[0].limits[1,1]
+
+        if action is None:  # states are group action wise
+            vs = []
+            v_primes = []
+            r_primes = []
+            for a in range(self.num_actions):
+                if state[a].size(0) > 0:
+                    p_v = state[a][:, :2]
+                    v = state[a][:, 1:2]
+                    #print(p_v.size())
+                    v_delta = self.tile_codings_v[a](p_v)
+                    v_prime = torch.clamp(v + v_delta, v_min, v_max)
+                    vs.append(v)
+                    v_primes.append(v_prime)
+                    r_primes.append(self.tile_codings_r[a](p_v))
+                else:
+                    v_primes.append(None)
+
+            p_primes = []
+            for a in range(self.num_actions):
+                if state[a].size(0) > 0:
+                    p_v = state[a][:, :2]
+                    p = state[a][:, 0:1]
+                    p_v_v_prime = torch.cat([p_v, v_primes[a]], 1)
+                    p_delta = self.tile_codings_p[a](p_v_v_prime)
+                    p_prime = torch.clamp(p + p_delta, p_min, p_max)
+                    p_primes.append(p_prime)
+
+            v_primes = [v_prime for v_prime in v_primes if v_prime is not None]
+            p_primes = torch.cat(p_primes, 0)
+            v_primes = torch.cat(v_primes, 0)
+            r_primes = torch.cat(r_primes, 0)
+
+            return torch.cat([p_primes, v_primes, r_primes], 1)
+        else:  # action is provided
+            p_v = state[:, :2]
+            v = state[:, 1:2]
+            v_delta = self.tile_codings_v[action](p_v)
+            v_prime = torch.clamp(v + v_delta, v_min, v_max)
+
+            p = state[:, :1]
+            p_v_v_prime = torch.cat([p_v, v_prime], 1)
+            p_delta = self.tile_codings_p[action](p_v_v_prime)
+            p_prime = torch.clamp(p + p_delta, p_min, p_max)
+
+            r_prime = self.tile_codings_r[action](p_v)
+
+            return torch.cat([p_prime, v_prime, r_prime], 1)
+
+
+
+class FastTileCoding_AntiCausal(nn.Module):
+    def __init__(self, num_actions, num_bins, num_tilings, limits, optimizer=None):
+        super(FastTileCoding_AntiCausal, self).__init__()
+        self.num_actions = num_actions
+        self.tile_codings_p = nn.ModuleList()
+        self.tile_codings_v = nn.ModuleList()
+        self.tile_codings_r = nn.ModuleList()
+        for _ in range(num_actions):
+            self.tile_codings_p.append(FastTileCoding(num_bins, num_tilings, limits))
+            self.tile_codings_v.append(FastTileCoding(int(num_bins ** (2/3)), num_tilings, np.concatenate([limits, limits[0:1]], 0)))
+            self.tile_codings_r.append(FastTileCoding(num_bins, num_tilings, limits))
+
+        self.optimizer = optimizer
+
+    def forward(self, state, action=None):
+        p_min, p_max = self.tile_codings_p[0].limits[0, 0], self.tile_codings_p[0].limits[0, 1]
+        v_min, v_max = self.tile_codings_p[0].limits[1, 0], self.tile_codings_p[0].limits[1, 1]
+        if action is None:  # states are group action wise
+            ps = []
+            p_primes = []
+            r_primes = []
+            for a in range(self.num_actions):
+                if state[a].size(0) > 0:
+                    p_v = state[a][:, :2]
+                    p = state[a][:, :1]
+                    p_delta = self.tile_codings_p[a](p_v)
+                    p_prime = torch.clamp(p + p_delta, p_min, p_max)
+                    ps.append(p)
+                    p_primes.append(p_prime)
+                    r_primes.append(self.tile_codings_r[a](p_v))
+                else:
+                    p_primes.append(None)
+
+            v_primes = []
+            for a in range(self.num_actions):
+                if state[a].size(0) > 0:
+                    p_v = state[a][:, :2]
+                    v = state[a][:, 1:2]
+                    p_v_p_prime = torch.cat([p_v, p_primes[a]], 1)
+                    v_delta = self.tile_codings_v[a](p_v_p_prime)
+                    v_prime = torch.clamp(v + v_delta, v_min, v_max)
+                    v_primes.append(v_prime)
+
+            p_primes = [p_prime for p_prime in p_primes if p_prime is not None]
+            p_primes = torch.cat(p_primes, 0)
+            v_primes = torch.cat(v_primes, 0)
+            r_primes = torch.cat(r_primes, 0)
+
+            return torch.cat([p_primes, v_primes, r_primes], 1)
+
+        else:  # action is provided
+            p_v = state[:, :2]
+            p = state[:, :1]
+            p_delta = self.tile_codings_p[action](p_v)
+            p_prime = torch.clamp(p + p_delta, p_min, p_max)
+
+            v = state[:, 1:2]
+            p_v_p_prime = torch.cat([p_v, p_prime], 1)
+            v_delta = self.tile_codings_v[action](p_v_p_prime)
+            v_prime = torch.clamp(v + v_delta, v_min, v_max)
+
+            r_prime = self.tile_codings_r[action](p_v)
+
+            return torch.cat([p_prime, v_prime, r_prime], 1)
+
+

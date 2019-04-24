@@ -63,3 +63,10 @@ class DataManager(object):
 
         return batch_x, batch_y, last_batch
 
+    def get_batch(self, bs):
+        idxs = np.arange(0, self.number_of_samples)
+        np.random.shuffle(idxs)
+        batch_x, batch_y = self.data_x[idxs[:bs]], self.data_y[idxs[:bs]]
+
+        return batch_x, batch_y
+
