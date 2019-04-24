@@ -65,7 +65,9 @@ class SparseGraphEnvironment(object):
                 acceptors = np.random.permutation(potential_acceptors)[:len(to_add)]
                 reshuffle = self.check_if_same(to_add, acceptors)
 
-            self.add_edges(to_add,acceptors)    
+            self.add_edges(to_add,acceptors)
+            used_nodes+=list(acceptors)    
+            used_nodes = list(set(used_nodes))
             not_used_yet = [i for i in np.arange(self.nb_nodes-1) if i not in used_nodes]
         return self.adjacency
 
@@ -112,7 +114,7 @@ class SparseGraphEnvironment(object):
 
     def make_transition(self):
         for i in np.arange(self.adjacency.shape[0]):
-            
+            #import pdb; pdb.set_trace()
             j_nodes = np.nonzero(self.adjacency[i])[0]
             max_actions = len(j_nodes)
             for a in np.arange(max_actions):
