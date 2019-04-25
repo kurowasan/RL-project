@@ -4,7 +4,49 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
 
-def moving_average(a, n=100) :
+def random_walk_episode(env, old_s1=None, old_s2=None):
+    i = 0
+    reward_array = np.zeros((env.max_step))
+    if old_s1 is None and old_s2 is None:
+        old_s1, old_s2 = env.reset()
+    observed_states = []
+    done = False
+    env.reset()
+    while not done:
+        a = env.sample_action_uniformly()
+        (s1, s2), reward, done, _ = env.step(a, old_s1, old_s2)
+        observed_states.append(s1 + s2*env.state_dim)
+        old_s1, old_s2 = s1, s2
+        reward_array[i] = reward
+        i += 1
+    return observed_states, reward
+
+def random_walk_from_every_start(env):
+    nb_state_visited = np.zeros((env.state_dim, env.state_dim))
+
+    for i in range(env.state_dim):
+        for j in range(env.state_dim):
+            observed_states, _ = random_walk_episode(env, i, j)
+            nb_state_visited[i, j] = len(set(observed_states))
+
+    return nb_state_visited
+
+def random_walk(env, nb_episode):
+    reward = np.zeros((nb_episode, env.max_step))
+    for episode in range(nb_episode):
+        _, r = random_walk_episode(env)
+        reward[episode] = r
+    return reward
+
+def test_ergodicity(env, hparam):
+    env.max_step = 10000
+    state_visited = random_walk_from_every_start(env)
+    print(f'nb states:{env.state_dim**2}')
+    print(state_visited)
+    plt.imshow(state_visited, cmap='hot', interpolation='nearest')
+    plt.show()
+
+def moving_average(a, n=20) :
     ret = np.cumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
     return ret[n - 1:] / n
@@ -40,6 +82,25 @@ def plot_graph(l_a2b, l_b2a, output, fname, savefig=False, title='', std=False):
     else:
         plt.show()
 
+def plot_graph_reward(r_a2b, r_b2a, output, fname, savefig=False, title='', std=False):
+    curve_a2b = np.mean(r_a2b, axis=0)
+    curve_b2a = np.mean(r_b2a, axis=0)
+
+    plt.figure()
+    plt.plot(curve_a2b, label='a->b', color='blue')
+    plt.plot(curve_b2a, label='b->a', color='red')
+    plt.title(title)
+    plt.xlabel('Nb episodes')
+    plt.ylabel('Cumulative Reward')
+    plt.legend()
+
+    if savefig:
+        img_path = os.path.join(output, f'{fname}.png')
+        plt.savefig(img_path)
+    else:
+        plt.show()
+
+
 def save_raw_data(l_a2b, l_b2a, output, fname):
     txt_path = os.path.join(output, f'{fname}_a2b.txt')
     np.savetxt(txt_path, l_a2b)
@@ -57,3 +118,15 @@ def plot_adaptation(l_a2b, l_b2a, output='', savefig=False):
     fname = 'adaptation'
     plot_graph(l_a2b, l_b2a, output, fname, savefig, title)
     save_raw_data(l_a2b, l_b2a, output, fname)
+
+def plot_reward(r_a2b, r_b2a, output='', savefig=False):
+    title = 'Reward during training'
+    fname = 'reward_training'
+    plot_graph_reward(r_a2b, r_b2a, output, fname, savefig, title)
+    save_raw_data(r_a2b, r_b2a, output, fname)
+
+def plot_reward_adapt(r_a2b, r_b2a, output='', savefig=False):
+    title = 'Reward change after adaptation'
+    fname = 'reward_adapt'
+    plot_graph_reward(r_a2b, r_b2a, output, fname, savefig, title)
+    save_raw_data(r_a2b, r_b2a, output, fname)

@@ -150,16 +150,17 @@ if __name__ == "__main__":
     parser.add_argument('--lr', type=float, default=0.05,  # did some hparam search
                         help='learning rate for learning the model')
     parser.add_argument('--alpha', type=float, default=1.1,  # did some hparam search to find it
-                        help='learning rate for RL')
+                        help='learning rate for RL before shift')
+    parser.add_argument('--alpha-shift', type=float, default=0.5,  # as suggested in Sutton's book
+                        help='learning rate for RL after shift')
     parser.add_argument('--gamma', type=float, default=1.,  # 1. makes sense in an episodic task
                         help='discount factor')
-    parser.add_argument('--epsilon', type=float, default=0.,  # did some hparam search to find it
+    parser.add_argument('--epsilon', type=float, default=0.,  # (optimistic initialization does the trick)
                         help='amount of exploration')
     parser.add_argument('--no-comet', action="store_true", help="disable comet.ml")
     opt = parser.parse_args()
 
     lr = opt.lr / opt.num_tiles
-    alpha = opt.alpha / opt.num_tiles
 
     if opt.model == 'joint':
         model = FastTileCoding_Joint(3, opt.num_bins, opt.num_tiles,
@@ -206,6 +207,7 @@ if __name__ == "__main__":
     for i_episode in range(opt.num_episodes + opt.num_episodes_shift):
         # before shift
         if i_episode == 0:
+            alpha = opt.alpha / opt.num_tiles
             #test_agent(agent, num_episodes=5, eps=0., render=True)  # render behavior of the agent
 
             i_env = 0  # total num of real interactions (in steps)
@@ -225,6 +227,7 @@ if __name__ == "__main__":
         # after shift
         elif i_episode == opt.num_episodes:
             env.close()
+            alpha = opt.alpha_shift / opt.num_tiles
             #test_agent(agent, num_episodes=5, eps=0., render=True)  # render behavior of the agent
             i_env = 0  # total num of real interactions (in steps)
             env = get_modified_MountainCarEnv(1)
@@ -271,7 +274,7 @@ if __name__ == "__main__":
                                                                          opt.bs_model, i_optim)
             else: model_loss, model_loss_eval = np.inf, np.inf
             # planning
-            if model_loss_eval < 0.05:
+            if model_loss < 0.05 and agent.data_buffer.number_of_samples > 500:
                 print("Planning")
                 i_plan = agent.plan(opt.num_plan_steps, i_plan, alpha, opt.gamma)
         else:

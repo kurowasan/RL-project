@@ -4,12 +4,19 @@ import torch.optim as optim
 import numpy as np
 import environment
 from approximators import FastTileCoding
+import utils
 
 class EnvironmentModel:
-    def __init__(self, state_dim, action_dim, determinist_reward=True):
+    def __init__(self, state_dim, action_dim, a2b, batch_size, lr, determinist_reward=True):
         self.state_dim = state_dim
         self.action_dim = action_dim
+        self.a2b = a2b
+        self.batch_size = batch_size
+        self.lr = lr
         self.determinist_reward = determinist_reward
+        self.likelihood = ModelInterface(state_dim, action_dim, a2b, batch_size, lr)
+        self.reset_observation()
+        self.simulation_total = 0
 
         if determinist_reward:
             self.reward_table = np.zeros((state_dim, state_dim, action_dim))
@@ -20,9 +27,37 @@ class EnvironmentModel:
             self.sum = np.zeros((state_dim, state_dim, action_dim))
             self.sum_sq = np.zeros((state_dim, state_dim, action_dim))
 
+    def update_observation(self, s):
+        self.observation[s.s1, s.s2, s.a] = 1
+
+    def reset_observation(self):
+        self.observation = np.zeros((self.state_dim, self.state_dim,
+                                     self.action_dim))
+
+    def sample_observation(self):
+        state_observed = np.sum(self.observation, axis=2)
+        idx = np.nonzero(state_observed)
+        choice = np.random.randint(len(idx[0]))
+        s1 = idx[0][choice]
+        s2 = idx[1][choice]
+        idx = np.nonzero(self.observation[s1, s2])
+        choice = np.random.randint(len(idx[0]))
+        a = int(self.observation[s1, s2, idx[0][choice]])
+        return s1, s2, a
+
+    def reinitialize_optimizer(self, lr):
+        self.lr = lr
+        self.likelihood.reinitialize_optimizer(lr)
+
     def update(self, s, reward):
+        l = self.likelihood.update(s)
+        self.update_observation(s)
+        self.update_reward(s, reward)
+        return l
+
+    def update_reward(self, s, reward):
         if self.determinist_reward:
-            self.reward_table[s.s1, s.s2, s.a] = reward
+            self.reward_table[s.old_s1, s.old_s2, s.a] = reward
         else:
             if self.count[s.s1, s.s2, s.a]:
                 self.k[s.s1, s.s2, s.a] = reward
@@ -48,34 +83,73 @@ class EnvironmentModel:
             reward = np.random.normal(mean, scale=std, size=1)
         return reward
 
-    def simulate(self, likelihood, old_s1, old_s2, a):
+    def simulate(self, old_s1, old_s2, a, env):
+        self.simulation_total += 1
         prob = np.zeros((self.state_dim*self.state_dim))
         state = environment.State()
+        #TODO: keep values for same step...
         for s1 in range(self.state_dim):
             for s2 in range(self.state_dim):
                 state.set_state(old_s1, old_s2, s1, s2, a)
-                l = likelihood.get_likelihood(state).detach().numpy()
+                l = self.likelihood.get_likelihood(state).detach().numpy()
                 prob[s1 + s2*self.state_dim] = np.exp(l)
+
         if np.sum(prob) != 1:
-            prob[-1] += 1-np.sum(prob)
-            # __import__('ipdb').set_trace()
+            prob = prob/np.sum(prob)
         s = np.random.choice(np.arange(prob.shape[0]), p=prob)
         s1 = s % self.state_dim
         s2 = s // self.state_dim
+        confidence_level = np.amax(prob)
+        if confidence_level > 0.5:
+            print(f'Prob max:{np.amax(prob)}')
+            print(f'simulation result: ({s1}, {s2})')
+            print(env.step(a, old_s1, old_s2))
+            # __import__('ipdb').set_trace()
         reward = self.sample_reward(s1, s2, a)
-        return s1, s2, reward
+        return s1, s2, reward, confidence_level
+
+
+class TDLearning:
+    def __init__(self, env, TEMPERATURE=1, GAMMA=0.9, STEP_SIZE=0.25):
+        self.temperature = TEMPERATURE
+        self.gamma = GAMMA
+        self.step_size = STEP_SIZE
+        self.env = env
+        self.q = np.zeros((env.state_dim**2, env.action_dim))
+        self.learning_function = self.q_learning
+
+    def flatten_state(self, s1, s2):
+        return s1 + s2 * self.env.state_dim
+
+    def sample_action(self, s1, s2):
+        s = self.flatten_state(s1, s2)
+        pi = utils.softmax(self.q[s])
+        return np.random.choice(self.q.shape[1], 1, p=pi)[0]
+
+    def best_action(self, s):
+        return np.argmax(self.q[s])
+
+    def update(self, s, reward):
+        action = s.a
+        s_prime = self.flatten_state(s.s1, s.s2)
+        s = self.flatten_state(s.old_s1, s.old_s2)
+        self.learning_function(s, s_prime, action, reward)
+
+    def q_learning(self, s, s_prime, a, reward):
+        self.q[s, a] += self.step_size*(reward + \
+                        self.gamma*(np.max(self.q[s_prime])) - self.q[s, a])
 
 
 class LikelihoodEstimators:
-    def __init__(self, s, action_dim, lr):
-        self.model_a2b = ModelInterface(s, action_dim, 1, lr)
-        self.model_b2a = ModelInterface(s, action_dim, 2, lr)
+    def __init__(self, s, action_dim, batch_size, lr):
+        self.model_a2b = ModelInterface(s, action_dim, 1, batch_size, lr)
+        self.model_b2a = ModelInterface(s, action_dim, 2, batch_size, lr)
 
     def update(self, state):
         l_a2b = self.model_a2b.get_likelihood(state)
         l_b2a = self.model_b2a.get_likelihood(state)
-        nll_a2b = self.model_a2b.update(state)
-        nll_b2a = self.model_b2a.update(state)
+        self.model_a2b.update(state)
+        self.model_b2a.update(state)
         return l_a2b, l_b2a
 
     def get_likelihood(self, state):
@@ -88,29 +162,30 @@ class LikelihoodEstimators:
 
 
 class ModelInterface:
-    def __init__(self, s, action_dim, a2b, lr=1e-4):
+    def __init__(self, s, action_dim, a2b, batch_size, lr=1e-4):
         cause = Cause(s,s,s, action_dim, a2b)
         effect = Effect(s,s,s,s, action_dim, a2b)
         self.a2b = a2b
         self.model = CausalModel(cause, effect)
         self.optim = optim.RMSprop(self.model.parameters(), lr=lr)
         self.nb_step = 0
+        self.batch_size = batch_size
 
     def reinitialize_optimizer(self, lr):
         self.optim = optim.RMSprop(self.model.parameters(), lr=lr)
 
-    def update(self, state, batch_size=10):
+    def update(self, state):
         if self.nb_step == 0:
             self.nll = torch.zeros(1)
         self.nb_step += 1
         self.model.train()
         self.nll += -self.model(state)
-        if self.nb_step % batch_size == 0:
+        if self.nb_step % self.batch_size == 0:
             self.nll.backward()
             self.optim.step()
             self.optim.zero_grad()
             self.nll = torch.zeros(1)
-        return -self.model(state).item()
+        return self.model(state).item()
 
     def get_likelihood(self, state):
         self.model.eval()
@@ -158,12 +233,9 @@ class CausalModel(nn.Module):
 class Cause(nn.Module):
     def __init__(self, s1, s2, s3, a, a2b):
         super().__init__()
-        self.s1_size = s1
-        self.s2_size = s2
-        self.s3_size = s3
         self.a_size = a
         self.a2b = a2b
-        self.w = nn.Parameter(torch.zeros((s1, s2, s3, a)))
+        self.w = nn.Parameter(torch.zeros((s1, s2, s3, a))) # zeros
 
     def forward(self, s):
         cste = torch.logsumexp(self.w[:, s.old_s1, s.old_s2, s.a], dim=0)
@@ -173,18 +245,13 @@ class Cause(nn.Module):
 class Effect(nn.Module):
     def __init__(self, s1, s2, s3, s4, a, a2b):
         super().__init__()
-        self.s1_size = s1
-        self.s2_size = s2
-        self.s3_size = s3
-        self.s4_size = s4
         self.a_size = a
         self.a2b = a2b
-        self.w = nn.Parameter(torch.zeros((s1, s2, s3, s4, a)))
+        self.w = nn.Parameter(torch.zeros((s1, s2, s3, s4, a))) # zeros
 
     def forward(self, s):
         _, old_s1, old_s2, node, a = s.get_effect(self.a2b)
         cste = torch.logsumexp(self.w[:, old_s1, old_s2, node, a], dim=0)
-
         return self.w[s.get_effect(self.a2b)] - cste
 
 
@@ -420,7 +487,6 @@ class FastTileCoding_Causal(nn.Module):
             return torch.cat([p_prime, v_prime, r_prime], 1)
 
 
-
 class FastTileCoding_AntiCausal(nn.Module):
     def __init__(self, num_actions, num_bins, num_tilings, limits, optimizer=None):
         super(FastTileCoding_AntiCausal, self).__init__()
@@ -485,5 +551,4 @@ class FastTileCoding_AntiCausal(nn.Module):
             r_prime = self.tile_codings_r[action](p_v)
 
             return torch.cat([p_prime, v_prime, r_prime], 1)
-
 
