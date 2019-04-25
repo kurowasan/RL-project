@@ -63,7 +63,7 @@ def train(env, likelihood, nb_episode):
 
 
 class DynaQ:
-    def __init__(self, env, env_model=None, confidence_threshold = 0.25):
+    def __init__(self, env, env_model=None, confidence_threshold=0.25):
         self.env = env
         self.model = env_model
         self.q_learning = model.TDLearning(env)
@@ -73,7 +73,39 @@ class DynaQ:
         self.q_learning = model.TDLearning(self.env)
         self.model.reset_observation()
 
-    def train(self, nb_episode, nb_simulation, buffer_size=None):
+    def train(self, nb_episode, nb_simulation):
+        s = environment.State()
+        likelihood_list = np.zeros(nb_episode)
+        reward_list = np.zeros(nb_episode)
+        if self.model is not None:
+            self.model.reset_observation()
+
+        for episode in range(nb_episode):
+            old_s1, old_s2 = self.env.reset()
+            nb_step = 0
+            # old_s1, old_s2 = 0, 0
+            done = False
+            while not done:
+                s, reward, done = self._learn(old_s1, old_s2)
+                # print(f'{old_s1}, {old_s2}, {s.s1}, {s.s2}')
+
+                # simulation
+                if self.model is not None:
+                    for _ in range(nb_simulation):
+                        self.simulate()
+
+                real_likelihood = self.env.get_likelihood(s.old_s1, s.old_s2, s.s1, s.s2, s.a)
+                l = self.model.likelihood.get_likelihood(s)
+                # likelihood_list[episode] += np.abs(real_likelihood - l.detach().numpy())
+                likelihood_list[episode] += l.detach().numpy()
+                reward_list[episode] += reward
+                old_s1, old_s2 = s.s1, s.s2
+                nb_step += 1
+            likelihood_list[episode] /= nb_step
+
+        return likelihood_list, reward_list
+
+    def train_with_buffer(self, nb_episode, nb_simulation, buffer_size=None):
         s = environment.State()
         if self.model is not None:
             self.model.reset_observation()
@@ -104,8 +136,8 @@ class DynaQ:
 
                 real_likelihood = self.env.get_likelihood(s.old_s1, s.old_s2, s.s1, s.s2, s.a)
                 l = self.model.likelihood.get_likelihood(s)
-                likelihood_list[episode] += np.abs(real_likelihood - l.detach().numpy())
-                reward_list[episode] += reward
+                likelihood_list[episode] = np.abs(real_likelihood - l.detach().numpy())
+                reward_list[episode] = reward
                 episode += 1
             shuffle(buffer)
 

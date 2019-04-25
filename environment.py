@@ -16,7 +16,7 @@ class CausalEnvironment:
         self.set_prob()
         self.final_reward = 100
         self.action_reward = -1
-        self.correct_path_reward = 10
+        self.correct_path_reward = 0
 
         if graph_traversal:
             self.graph_env = SparseGraphEnvironment(state_dim, correct_path_proportion=correct_path_proportion, branching_prob=branching_prob, nb_actions=action_dim)
@@ -24,6 +24,8 @@ class CausalEnvironment:
             self.mask = self.graph_env.transition.reshape((state_dim, state_dim,
                                                            state_dim, state_dim,
                                                            action_dim))
+            self.mask = np.moveaxis(self.mask, 0, 1)
+            self.mask = np.moveaxis(self.mask, 2, 3)
             self.s1 = self.reshape_s1(self.mask)
             self.s2 = self.reshape_s2(self.mask)
             # self.normalize_s1()
@@ -146,9 +148,11 @@ class CausalEnvironment:
     def sample_state(self, prob, n=1):
         return np.argmax(np.random.multinomial(1, prob, size=n))
 
-    def sample_reward(self, s1, s2, a):
+    def sample_reward(self, s1, s2, a, old_s1, old_s2):
         if self.deterministic_reward:
-            reward = self.reward[s1, s2, a]
+            old_s = old_s1 + old_s2*self.state_dim
+            s = s1 + s2*self.state_dim
+            reward = self.reward[old_s, s, a]
         else:
             r = self.reward[s1, s2, a]
             reward = np.random.normal(r, 0.1, 1)
@@ -169,9 +173,11 @@ class CausalEnvironment:
         self.sample(action, old_s1, old_s2)
 
         self.n_step += 1
-        reward = self.sample_reward(self.state_a, self.state_b, action)
+        reward = self.sample_reward(self.state_a, self.state_b, action, old_s1, old_s2)
         if self.n_step >= self.max_step or reward == self.final_reward:
             done = True
+            if reward == self.final_reward:
+                print('BINGO')
         else:
             done = False
         return (self.state_a, self.state_b), reward, done, 0

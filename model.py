@@ -109,7 +109,7 @@ class EnvironmentModel:
 
 
 class TDLearning:
-    def __init__(self, env, TEMPERATURE=1, GAMMA=0.9, STEP_SIZE=0.25):
+    def __init__(self, env, TEMPERATURE=1, GAMMA=0.999, STEP_SIZE=0.125):
         self.temperature = TEMPERATURE
         self.gamma = GAMMA
         self.step_size = STEP_SIZE
@@ -125,7 +125,8 @@ class TDLearning:
         pi = utils.softmax(self.q[s])
         return np.random.choice(self.q.shape[1], 1, p=pi)[0]
 
-    def best_action(self, s):
+    def best_action(self, s1, s2):
+        s = self.flatten_state(s1, s2)
         return np.argmax(self.q[s])
 
     def update(self, s, reward):

@@ -32,8 +32,8 @@ if __name__ == '__main__':
                                             hparam['peak'])
 
         if rl_mode:
-            reward_random = utils.random_walk(env, hparam['nb_episode'])
-            print(f'Reward for random walk: {np.sum(reward_random)} for episode: {hparam["nb_episode"]}')
+            # reward_random = utils.random_walk(env, hparam['nb_episode'])
+            # print(f'Reward for random walk: {np.sum(reward_random)} for episode: {hparam["nb_episode"]}')
 
             model_a2b = model.EnvironmentModel(hparam['state_dim'], hparam['action_dim'], 1,
                                                hparam['batch_size'], hparam['lr'], True)
@@ -68,12 +68,11 @@ if __name__ == '__main__':
 
             # reset all!
             env.adapt_a()
-            # print('Test ergodicity')
 
             dyna_a2b.reset()
             dyna_b2a.reset()
-            model_a2b.reinitialize_optimizer(lr=1e-1)
-            model_b2a.reinitialize_optimizer(lr=1e-1)
+            model_a2b.reinitialize_optimizer(lr=1e-2)
+            model_b2a.reinitialize_optimizer(lr=1e-2)
 
             l_a2b, r_a2b = dyna_a2b.train(hparam['nb_episode_adapt'], hparam['nb_simulation'])
             print('a->b finished')
