@@ -59,6 +59,12 @@ class Agent:
         self.model = model
         self.data_buffer = data_buffer
 
+    def reset_q(self):
+        with torch.no_grad():
+            self.q.tile_codings_q[0].weights.copy_(torch.zeros(size=(1,)))
+            self.q.tile_codings_q[1].weights.copy_(torch.zeros(size=(1,)))
+            self.q.tile_codings_q[2].weights.copy_(torch.zeros(size=(1,)))
+
     def get_action(self, s, eps=0.):
         explore = np.random.uniform(0, 1) < eps
         if explore:
@@ -157,7 +163,10 @@ if __name__ == "__main__":
                         help='discount factor')
     parser.add_argument('--epsilon', type=float, default=0.,  # (optimistic initialization does the trick)
                         help='amount of exploration')
-    parser.add_argument('--no-comet', action="store_true", help="disable comet.ml")
+    parser.add_argument('--reset-q', action="store_true",
+                        help="reset q function after shift, to do more exploration")
+    parser.add_argument('--no-comet', action="store_true",
+                        help="disable comet.ml")
     opt = parser.parse_args()
 
     lr = opt.lr / opt.num_tiles
@@ -239,6 +248,8 @@ if __name__ == "__main__":
             agent.data_buffer = DataManager(opt.buffer_size, 5, 3, remove_random=False)
 
             model.optimizer = torch.optim.Adagrad(agent.model.parameters(), lr=lr)
+
+            if opt.reset_q: agent.reset_q()
 
         total_reward = 0
         state = env.reset()
