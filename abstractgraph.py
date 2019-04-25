@@ -2,11 +2,12 @@ import numpy as np
 
 class SparseGraphEnvironment(object):
     """Environment with a sparse path through a graph"""
-    def __init__(self, state_dim=10, correct_path_proportion = 0.2,
-                 branching_prob = 1.0, nb_actions = 4, arborescent = True):
+    def __init__(self, state_dim=10, correct_path_proportion = 0.1,
+                branching_prob = 1.0, nb_actions = 4, arborescent = False):
         super(SparseGraphEnvironment, self).__init__()
         self.nb_nodes = state_dim*state_dim
-        self.correct_path_proportion = correct_path_proportion
+        #self.correct_path_proportion = correct_path_proportion
+        self.correct_path_proportion = (np.log2(self.nb_nodes))/self.nb_nodes
         self.branching_prob = branching_prob
         self.nb_actions = nb_actions
         self.start = 0
@@ -35,7 +36,7 @@ class SparseGraphEnvironment(object):
             self.adjacency[j,i]=1
 
     def get_usable_nodes(self,adjacency):
-        usable = [i for i in np.arange(self.nb_nodes-1) if np.sum(self.adjacency[i,:])< self.nb_actions]
+        usable = [i for i in np.arange(self.nb_nodes-1) if np.sum(self.adjacency[i,:])< self.nb_actions and np.sum(self.adjacency[i,:])> 0 ]
         return usable
 
     def check_if_same(self,from_node,to_node):
@@ -51,13 +52,12 @@ class SparseGraphEnvironment(object):
 
         ### creating the first level of alternative paths
         used_nodes = [i for i in np.arange(self.nb_nodes) if i in self.correct_path]
-        not_used_yet = [i for i in np.arange(self.nb_nodes-1) if i not in used_nodes]
+        not_used_yet = not_used_yet = np.arange(self.nb_nodes)[(np.sum(self.adjacency,axis=1)==0)]
+        print(self.nb_nodes)
 
-
-        while len(not_used_yet)>0:
+        while np.sum(np.sum(self.adjacency,axis=1)==0)>0:
             potential_acceptors = self.get_usable_nodes(self.adjacency)    
-            to_add = np.random.permutation(not_used_yet)[:int(np.ceil(len(not_used_yet)*self.branching_prob))]
-            used_nodes = used_nodes+list(to_add)
+            to_add = np.random.permutation(not_used_yet)[:int(np.ceil(len(not_used_yet)*0.8))]
             acceptors = np.random.permutation(potential_acceptors)[:len(to_add)]
 
             reshuffle = self.check_if_same(to_add, acceptors) #checking that the edges are between different nodes! (non-absorbing)
@@ -66,9 +66,11 @@ class SparseGraphEnvironment(object):
                 reshuffle = self.check_if_same(to_add, acceptors)
 
             self.add_edges(to_add,acceptors)
-            used_nodes+=list(acceptors)    
+            used_nodes = used_nodes+list(acceptors)
+            used_nodes = used_nodes+list(to_add)
             used_nodes = list(set(used_nodes))
-            not_used_yet = [i for i in np.arange(self.nb_nodes-1) if i not in used_nodes]
+
+            not_used_yet = np.arange(self.nb_nodes)[(np.sum(self.adjacency,axis=1)==0)]
         return self.adjacency
 
     def make_tree(self):
