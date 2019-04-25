@@ -10,14 +10,12 @@ def parse():
                         help='number of possible actions')
     parser.add_argument('--nb-episode', type=int, default=1000,
                         help='number of episode used for training')
-    parser.add_argument('--nb-episode-adapt', type=int, default=200,
+    parser.add_argument('--nb-episode-adapt', type=int, default=500,
                         help='number of episode used for adaptation')
-    parser.add_argument('--nb-run', type=int, default=1,
+    parser.add_argument('--nb-run', type=int, default=10,
                         help='number of independent run')
-    parser.add_argument('--nb-step', type=int, default=50,
+    parser.add_argument('--nb-step', type=int, default=100,
                         help='length of episodes')
-    parser.add_argument('--epsilon', type=float, default=0.1,
-                        help='epsilon for the normalisation')
 
     parser.add_argument('--confidence-threshold', type=float, default=0.25,
                         help='confidence threshold for the DynaQ simulation')

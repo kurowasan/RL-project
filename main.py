@@ -43,9 +43,9 @@ if __name__ == '__main__':
             dyna_a2b = control.DynaQ(env, model_a2b, hparam['confidence_threshold'])
             dyna_b2a = control.DynaQ(env, model_b2a, hparam['confidence_threshold'])
 
-            l_a2b, r_a2b = dyna_a2b.train(hparam['nb_episode'], hparam['nb_simulation'])
+            l_a2b, r_a2b = dyna_a2b.train(hparam['nb_episode'], 0) # hparam['nb_simulation'])
             print('a->b finished')
-            l_b2a, r_b2a = dyna_b2a.train(hparam['nb_episode'], hparam['nb_simulation'])
+            l_b2a, r_b2a = dyna_b2a.train(hparam['nb_episode'], 0) # hparam['nb_simulation'])
             print('b->a finished')
             likelihood_a2b[run, :] = l_a2b
             likelihood_b2a[run, :] = l_b2a
@@ -71,8 +71,8 @@ if __name__ == '__main__':
 
             dyna_a2b.reset()
             dyna_b2a.reset()
-            model_a2b.reinitialize_optimizer(lr=1e-2)
-            model_b2a.reinitialize_optimizer(lr=1e-2)
+            model_a2b.reinitialize_optimizer(lr=1e-1)
+            model_b2a.reinitialize_optimizer(lr=1e-1)
 
             l_a2b, r_a2b = dyna_a2b.train(hparam['nb_episode_adapt'], hparam['nb_simulation'])
             print('a->b finished')

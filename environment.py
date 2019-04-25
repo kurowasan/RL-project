@@ -176,8 +176,6 @@ class CausalEnvironment:
         reward = self.sample_reward(self.state_a, self.state_b, action, old_s1, old_s2)
         if self.n_step >= self.max_step or reward == self.final_reward:
             done = True
-            if reward == self.final_reward:
-                print('BINGO')
         else:
             done = False
         return (self.state_a, self.state_b), reward, done, 0
